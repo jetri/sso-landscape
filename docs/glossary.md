@@ -18,10 +18,6 @@ Microsoft's on-premises directory service that stores user accounts, groups, and
 
 On-premises Windows Server role that acts as a federation IdP/STS for in-house applications backed by Active Directory. It issues WS-Federation or SAML tokens to relying party trusts and can federate outbound to cloud IdPs. Choose ADFS when the app, users, and trust model are still AD-centric; plan Entra migration when building new cloud-facing workloads.
 
-### Assertion
-
-A signed SAML structure that carries one or more claims about a subject, issued by the IdP and consumed by the SP at the ACS. Assertions bind authentication and attribute statements to a specific audience and lifetime. Do not conflate an assertion with a single claim—claims are the name–value statements inside the signed envelope.
-
 ### Audience (`aud`)
 
 A claim that names the intended recipient of a token—typically an API's Application ID URI or client ID. Resource servers must reject tokens whose `aud` does not match their configured identifier; wrong audience is a frequent integration defect. Align audience between token issuer settings and API validation logic before go-live.
@@ -30,9 +26,11 @@ A claim that names the intended recipient of a token—typically an API's Applic
 
 An external identity invited into your Entra tenant to access your applications without creating a full member account in your directory. The guest may authenticate via their home IdP (federated) or a one-time passcode, depending on trust configuration. Use B2B when partner org users need access to your apps; distinguish guests from native members for licensing, Conditional Access, and group assignment.
 
-### Claim
+### Claim / assertion
 
-A name–value statement about a subject (user, client, or session) embedded in a token, SAML assertion, or OIDC ID token. IdPs map directory attributes to outbound claims; applications rely on specific claims (UPN, email, groups, roles) for authorization decisions. Define required claims early so issuance rules and app expectations stay aligned across SAML, OIDC, and WS-Fed integrations.
+**Claim:** A name–value statement about a subject (user, client, or session) embedded in a token, SAML assertion, or OIDC ID token. IdPs map directory attributes to outbound claims; applications rely on specific claims (UPN, email, groups, roles) for authorization decisions.
+
+**Assertion:** A signed SAML structure that carries one or more claims about a subject, issued by the IdP and consumed by the SP at the ACS. Assertions bind authentication and attribute statements to a specific audience and lifetime—the signed envelope, not a single claim inside it.
 
 ### Client credentials
 
@@ -56,7 +54,7 @@ The identifier (`iss` claim or SAML `<Issuer>`) that names the token-issuing aut
 
 ### OAuth 2.0
 
-An authorization framework for obtaining limited access to resources on behalf of a resource owner or client. It defines core grant types (authorization code, client credentials, refresh token, device code, and others) and separates the authorization server from resource APIs. Pair OAuth 2.0 with OIDC when browser or native apps need both API access and standardized identity claims.
+An authorization framework for obtaining limited access to resources on behalf of a resource owner or client. Core grant types are authorization code, client credentials, and refresh token exchange (the implicit grant is legacy and deprecated). Extensions such as device authorization (RFC 8628) address additional client scenarios. OAuth 2.0 separates the authorization server from resource APIs; pair it with OIDC when browser or native apps need both API access and standardized identity claims.
 
 ### OIDC (OpenID Connect)
 
@@ -72,7 +70,7 @@ The pre-registered callback URL where the authorization server sends the user (a
 
 ### Refresh token
 
-An OAuth 2.0 credential issued alongside an access token that the client exchanges for new access tokens (and optionally a new refresh token) without re-prompting the user. Use refresh tokens for long-lived sessions in confidential clients that can store them securely; avoid issuing or storing refresh tokens in browser-only SPAs when a backend or token broker can hold them instead.
+An OAuth 2.0 credential optionally issued by the authorization server that a client presents only to the token endpoint—never to resource APIs as a Bearer credential—to obtain new access tokens (and optionally a new refresh token) without re-prompting the user. Confidential and public clients, including native and mobile apps, may receive refresh tokens when authorization server policy allows, typically with controls such as PKCE, rotation, and secure storage. Prefer a backend or token broker to hold refresh tokens for browser-only SPAs when possible.
 
 ### Relying party (WS-Fed) / Relying party trust
 
