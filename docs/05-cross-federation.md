@@ -39,7 +39,7 @@ When the partner org does **not** use Entra ID, configure their IdP — **Okta**
 
 This is still **B2B**: Entra still creates and manages a guest object for each partner user in your tenant. Federation only changes the guest's **authentication method** — where their credentials are verified — not whether an account exists or whether an invitation/onboarding step happens.
 
-**Protocol scope:** **SAML 2.0 and WS-Fed** are the mature, broadly supported protocols for federating an arbitrary workforce partner IdP this way. Entra also supports Google federation and a more limited (and, depending on tenant, preview-stage) generic **OIDC** identity provider federation option — treat generic OIDC inbound federation as a narrower feature set with fewer partner-IdP guarantees, not a drop-in equivalent to SAML/WS-Fed federation, unless you've confirmed parity for your specific partner IdP and tenant.
+**Protocol scope:** **SAML 2.0 and WS-Fed** are the protocols for workforce B2B direct federation with an arbitrary partner IdP (Okta, Ping, ADFS, and similar). Google workspace federation is a separate, vendor-specific path. Inbound **OIDC identity provider federation** is an **Entra External ID** (CIAM / external-tenant) feature — **out of scope** for this workforce reference; do not treat it as an available pattern for federating partner workforce IdPs in a corporate tenant.
 
 **Partner is another Entra tenant?** Don't configure it as a SAML/WS-Fed identity provider — use Option A (native B2B / cross-tenant access) instead.
 
@@ -48,7 +48,7 @@ This is still **B2B**: Entra still creates and manages a guest object for each p
 - **Federation metadata URL** — partner publishes SAML metadata (or WS-Fed federation metadata); your Entra imports endpoints and signing certificates
 - **Issuer URI** — the identifier your Entra expects on inbound assertions (`Issuer` / entity ID); must match partner configuration exactly
 - **Domain federation** — maps an email domain (e.g., `partner.com`) to the federated IdP so Entra routes matching guests to the partner sign-in flow instead of OTP
-- **Claim mapping** — translate partner NameID / claims, email, and group claims into Entra user attributes; plan transforms when partner claim types differ from your app expectations
+- **Inbound claim requirements** — Entra's federation trust expects fixed inbound claims per Microsoft documentation: a **persistent NameID** (SAML/WS-Fed) and a matchable **email address** so Entra can create or match the guest object. Federation configuration does not offer free-form inbound transform rules for groups, roles, or `preferred_username` the way an app's outbound claims do. Configure **your applications** separately to consume the claims Entra puts in the SAML assertion, OIDC ID token, or access token **after** B2B sign-in completes (see [03 — Browser SSO](./03-browser-sso-saml-oidc.md) and [07 — Key configurations](./07-key-configurations.md))
 
 Federating a domain to a partner IdP still results in guest objects for that population — it changes *how* guests authenticate and can reduce reliance on per-user email OTP, but it does not remove the guest account, its assignment requirements, or its lifecycle review.
 
@@ -102,10 +102,11 @@ Your Entra does not uniformly hand the browser "tokens" for every app: **OIDC/OA
 
 Detailed checklists and Entra field names live in [07 — Key configurations](./07-key-configurations.md). For cross-federation, confirm at minimum:
 
-- **Federation metadata URL** — partner SAML metadata or WS-Fed federation metadata (or OIDC discovery document, only where generic OIDC federation is in use); refresh after partner certificate rollover
-- **Issuer URI** — inbound issuer matches partner IdP entity ID (or OIDC `iss`, where applicable); mismatch causes immediate sign-in failure
+- **Federation metadata URL** — partner SAML metadata or WS-Fed federation metadata; refresh after partner certificate rollover
+- **Issuer URI** — inbound issuer matches partner IdP entity ID (`Issuer` / entity ID); mismatch causes immediate sign-in failure
 - **Federated domain** — verified partner domain routed to the federated SAML/WS-Fed IdP (Option B) or covered by cross-tenant access settings (Option A / Entra↔Entra)
-- **Claim mapping** — email/UPN, display name, and optional group or role claims mapped to what your apps and Conditional Access policies expect
+- **Inbound claim requirements** — partner IdP must send the persistent NameID and email address Entra expects; validate partner SAML/WS-Fed configuration against Microsoft's federation claim requirements rather than assuming arbitrary inbound remap rules
+- **Application outbound claims** — after B2B sign-in, configure each enterprise application or app registration for the UPN, email, display name, group, or role claims your apps and Conditional Access policies consume from **Entra-issued** assertions or tokens
 - **`userType`, licensing, and Conditional Access are distinct settings** — B2B collaboration users commonly default to `userType = Guest`, but licensing (e.g., external identity monthly active user billing), Conditional Access scoping (`All guest and external users` vs specific users/groups), and group assignment are each configured independently; don't assume setting `userType` alone determines every policy outcome
 - **Application assignment** — enterprise applications and app registrations must allow guest access where partner users need entry; review default member-only assignments
 
@@ -113,10 +114,10 @@ Detailed checklists and Entra field names live in [07 — Key configurations](./
 
 - **Assuming federation removes the guest account** — SAML/WS-Fed IdP federation is an authentication method *for* B2B guests, not a replacement for one; a federated domain still produces guest objects with a lifecycle, assignment, and access reviews in your tenant
 - **Configuring SAML federation between two Entra tenants** — when the partner already has Entra ID, use native B2B collaboration and cross-tenant access settings (Option A), not a custom SAML/WS-Fed identity provider; treating Entra↔Entra as a generic SAML federation problem is unnecessary and harder to maintain
-- **Treating generic OIDC inbound federation as equivalent to SAML/WS-Fed** — Entra's SAML 2.0 / WS-Fed identity provider federation is the mature path for arbitrary workforce partner IdPs; generic OIDC federation has a narrower feature set and should be validated per partner IdP before relying on it
+- **Expecting OIDC inbound IdP federation in a workforce tenant** — workforce B2B direct federation is **SAML 2.0 / WS-Fed only**. Inbound OIDC IdP federation belongs to **Entra External ID** (CIAM) scenarios and is **out of scope** here; do not plan a partner Okta/Ping federation around generic OIDC in a corporate workforce tenant
 - **Treating guests like members** — guest users commonly default to `userType = Guest`, but licensing, Conditional Access, and group limits are separate settings; policies that assume `Member` user type or that assume `userType` alone drives every outcome can block partner access silently or at CA evaluation
 - **Issuer mismatch** — partner rotates IdP certificates or changes entity ID without updating your federation trust; validate the issuer/entity ID and signing cert on every partner change
-- **Missing claim transforms** — partner sends `email` but your app expects `preferred_username` or a SAML NameID format Entra does not map by default; define explicit inbound claim rules
+- **Assuming inbound federation claim transforms** — Entra's trust with the partner IdP enforces required inbound claims (persistent NameID, email), not arbitrary remap rules. If your app expects `preferred_username`, a specific SAML NameID format, or group claims, configure **outbound** claims on the Entra enterprise application or app registration for what Entra emits **after** guest sign-in — do not expect the federation trust itself to rewrite partner assertions freely
 - **Reply URL and redirect URI unchanged** — federation fixes upstream auth but your app's ACS/redirect URI must still match registration; partner federation does not relax SP/RP URL exact-match rules
 
 ## Related
