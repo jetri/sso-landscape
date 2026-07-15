@@ -114,5 +114,6 @@ Detailed checklists and Entra field names live in [07 — Key configurations](./
 - [02 — Components and network topology](./02-components-and-topology.md)
 - [04 — API OAuth and OBO](./04-api-oauth-obo.md)
 - [05 — Cross-federation](./05-cross-federation.md)
+- [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md) — legacy ADFS alternative
 - [07 — Key configurations](./07-key-configurations.md)
 - [Glossary](./glossary.md)
