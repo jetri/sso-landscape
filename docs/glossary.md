@@ -54,7 +54,7 @@ The identifier (`iss` claim or SAML `<Issuer>`) that names the token-issuing aut
 
 ### OAuth 2.0
 
-An authorization framework for obtaining limited access to resources on behalf of a resource owner or client. Core grant types are authorization code, client credentials, and refresh token exchange (the implicit grant is legacy and deprecated). Extensions such as device authorization (RFC 8628) address additional client scenarios. OAuth 2.0 separates the authorization server from resource APIs; pair it with OIDC when browser or native apps need both API access and standardized identity claims.
+An authorization framework for obtaining limited access to resources on behalf of a resource owner or client. Recommended grant types are authorization code and client credentials, with refresh tokens for token renewal; resource owner password credentials and implicit grants are legacy and deprecated, and device authorization (RFC 8628) and similar extensions cover other scenarios. OAuth 2.0 separates the authorization server from resource APIs; pair it with OIDC when browser or native apps need both API access and standardized identity claims.
 
 ### OIDC (OpenID Connect)
 
