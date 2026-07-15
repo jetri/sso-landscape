@@ -35,7 +35,7 @@ See the **Partner federation** subgraph in [02 — Components and network topolo
 
 ## Option B — B2B with a federated SAML/WS-Fed identity provider
 
-When the partner org does **not** use Entra ID, configure their IdP — **Okta**, **Ping Identity**, **ADFS**, or another **SAML 2.0 or WS-Fed** authority — as a federated identity provider under Entra's external identity providers, then map a verified partner **domain** to it. Guests whose email matches that domain are redirected to the partner IdP to authenticate instead of using an Entra-managed password or email one-time passcode.
+When the partner org does **not** use Entra ID, configure their IdP — **Okta**, **Ping Identity**, **ADFS**, or another **SAML 2.0 or WS-Fed** authority — as a federated identity provider under Entra's external identity providers. Entra then routes matching B2B guest sign-ins to the partner IdP instead of using an Entra-managed password or email one-time passcode. **How** Entra associates a guest with that federation trust is configurable: **verified-domain mapping** is the most common pattern, but Entra also supports **unverified-domain** federation (with constraints) and **domainless SAML** routing via issuer association plus `domain_hint` where applicable.
 
 This is still **B2B**: Entra still creates and manages a guest object for each partner user in your tenant. Federation only changes the guest's **authentication method** — where their credentials are verified — not whether an account exists or whether an invitation/onboarding step happens.
 
@@ -47,10 +47,13 @@ This is still **B2B**: Entra still creates and manages a guest object for each p
 
 - **Federation metadata URL** — partner publishes SAML metadata (or WS-Fed federation metadata); your Entra imports endpoints and signing certificates
 - **Issuer URI** — the identifier your Entra expects on inbound assertions (`Issuer` / entity ID); must match partner configuration exactly
-- **Domain federation** — maps an email domain (e.g., `partner.com`) to the federated IdP so Entra routes matching guests to the partner sign-in flow instead of OTP
+- **Federation routing (choose a pattern)** — multiple association models exist; pick the one that fits partner onboarding and domain control:
+  - **Verified domain** — map a partner email domain you have **verified** in your tenant (e.g., `partner.com`) to the federated IdP; guests whose UPN/email matches that domain are redirected to the partner sign-in flow. Most common when you can verify the partner domain.
+  - **Unverified domain** — map a partner email domain **without** verifying it in your tenant first; supported with constraints (for example, domain-conflict rules and sign-in limitations may apply). Use when domain verification is impractical but domain-based routing still fits.
+  - **Domainless SAML (issuer + hint)** — associate the trust primarily by **issuer** / metadata and route sign-in using **issuer association** plus **`domain_hint`** (or equivalent login hints) where applicable, without relying on a verified domain map. Confirm current Microsoft direct-federation guidance for your scenario before assuming domainless routing.
 - **Inbound claim requirements** — Entra's federation trust expects fixed inbound claims per Microsoft documentation, protocol-specific: for **SAML 2.0**, a **persistent NameID** and a matchable **email address**; for **WS-Fed**, **ImmutableID** and **emailaddress**. These let Entra create or match the guest object. Federation configuration does not offer free-form inbound transform rules for groups, roles, or `preferred_username` the way an app's outbound claims do. Configure **your applications** separately to consume the claims Entra puts in the SAML assertion, OIDC ID token, or access token **after** B2B sign-in completes (see [03 — Browser SSO](./03-browser-sso-saml-oidc.md) and [07 — Key configurations](./07-key-configurations.md))
 
-Federating a domain to a partner IdP still results in guest objects for that population — it changes *how* guests authenticate and can reduce reliance on per-user email OTP, but it does not remove the guest account, its assignment requirements, or its lifecycle review.
+Any federation routing pattern still results in guest objects for that population — it changes *how* guests authenticate and can reduce reliance on per-user email OTP, but it does not remove the guest account, its assignment requirements, or its lifecycle review.
 
 ## B2B vs federated IdP (decision)
 
@@ -61,7 +64,7 @@ Both rows below are **B2B collaboration**. The decision is which **authenticatio
 | **Home IdP / protocol** | Partner's own Entra tenant; cross-tenant access settings | Okta, Ping, ADFS, or other SAML 2.0 / WS-Fed authority configured as a federated identity provider |
 | **Applies when** | Partner org uses Entra ID | Partner org does **not** use Entra ID |
 | **Who manages credentials** | Partner org, in their Entra tenant | Partner org, in their SAML/WS-Fed IdP |
-| **You configure** | Cross-tenant access settings (inbound/outbound B2B trust; inbound can accept home-tenant MFA and device claims) | Federated IdP metadata, issuer, domain federation mapping |
+| **You configure** | Cross-tenant access settings (inbound/outbound B2B trust; inbound can accept home-tenant MFA and device claims) | Federated IdP metadata, issuer, and a federation routing pattern: verified domain (common), unverified domain (with constraints), or domainless SAML via issuer association + `domain_hint` where applicable |
 | **Guest object in your tenant** | Yes — created by invitation, self-service sign-up, or cross-tenant sync | Yes — created on first sign-in or invitation; federation just points its auth at the partner IdP |
 
 **Onboarding path (orthogonal to the table above, applies to either option):** a guest object can arrive via administrator invitation, self-service sign-up (optionally gated by entitlement management), or automated provisioning — independent of whether that guest's sign-in ultimately uses native Entra routing or a federated SAML/WS-Fed IdP.
@@ -104,7 +107,7 @@ Detailed checklists and Entra field names live in [07 — Key configurations](./
 
 - **Federation metadata URL** — partner SAML metadata or WS-Fed federation metadata; refresh after partner certificate rollover
 - **Issuer URI** — inbound issuer matches partner IdP entity ID (`Issuer` / entity ID); mismatch causes immediate sign-in failure
-- **Federated domain** — verified partner domain routed to the federated SAML/WS-Fed IdP (Option B) or covered by cross-tenant access settings (Option A / Entra↔Entra)
+- **Federation routing / domain association** — confirm which pattern applies for Option B: **verified-domain** map (most common), **unverified-domain** map (with constraints), or **domainless SAML** via issuer association + `domain_hint` where applicable; for Option A (Entra↔Entra), routing is governed by cross-tenant access settings rather than a SAML/WS-Fed domain map
 - **Inbound claim requirements** — partner IdP must send the required inbound claims Entra expects: **persistent NameID** and email for **SAML 2.0**, or **ImmutableID** and **emailaddress** for **WS-Fed**; validate partner configuration against Microsoft's direct-federation claim requirements rather than assuming arbitrary inbound remap rules
 - **Application outbound claims** — after B2B sign-in, configure each enterprise application or app registration for the UPN, email, display name, group, or role claims your **applications** need in **Entra-issued** assertions or tokens. Conditional Access evaluates sign-in conditions separately; it does not consume application outbound claim configuration
 - **`userType`, licensing, and Conditional Access are distinct settings** — B2B collaboration users commonly default to `userType = Guest`, but licensing (e.g., external identity monthly active user billing), Conditional Access scoping (`All guest and external users` vs specific users/groups), and group assignment are each configured independently; don't assume setting `userType` alone determines every policy outcome
@@ -112,7 +115,8 @@ Detailed checklists and Entra field names live in [07 — Key configurations](./
 
 ## Common pitfalls
 
-- **Assuming federation removes the guest account** — SAML/WS-Fed IdP federation is an authentication method *for* B2B guests, not a replacement for one; a federated domain still produces guest objects with a lifecycle, assignment, and access reviews in your tenant
+- **Assuming verified domain is mandatory** — verified-domain mapping is the most common B2B direct-federation pattern, but Entra also supports unverified-domain federation (with constraints) and domainless SAML via issuer association + `domain_hint` where applicable; choose the routing pattern that matches partner domain control and onboarding constraints
+- **Assuming federation removes the guest account** — SAML/WS-Fed IdP federation is an authentication method *for* B2B guests, not a replacement for one; any federation routing pattern still produces guest objects with a lifecycle, assignment, and access reviews in your tenant
 - **Configuring SAML federation between two Entra tenants** — when the partner already has Entra ID, use native B2B collaboration and cross-tenant access settings (Option A), not a custom SAML/WS-Fed identity provider; treating Entra↔Entra as a generic SAML federation problem is unnecessary and harder to maintain
 - **Expecting OIDC inbound IdP federation in a workforce tenant** — workforce B2B direct federation is **SAML 2.0 / WS-Fed only**. Inbound OIDC IdP federation belongs to **Entra External ID** (CIAM) scenarios and is **out of scope** here; do not plan a partner Okta/Ping federation around generic OIDC in a corporate workforce tenant
 - **Treating guests like members** — guest users commonly default to `userType = Guest`, but licensing, Conditional Access, and group limits are separate settings; policies that assume `Member` user type or that assume `userType` alone drives every outcome can block partner access silently or at CA evaluation
