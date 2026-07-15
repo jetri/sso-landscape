@@ -25,7 +25,7 @@
 
 **When:** A signed-in user (or interactive login) should call an API **as themselves**. The client obtains an access token with **delegated permissions** (scopes) that represent what the user is allowed to do.
 
-**Flow:** Authorization code with **PKCE** for both public and confidential clients. Confidential clients also authenticate at the token endpoint with a client secret or certificate. After login, the token endpoint returns an **access token** whose **`aud`** (audience) is the target API—not the client app's ID. On the **Microsoft identity platform (v2)**, `aud` is often the API registration's **client ID (GUID)**; on **v1 / legacy** tokens, `aud` is often the API's **Application ID URI** (`api://…`). Validate against what Entra actually issues for your endpoint version. The client sends `Authorization: Bearer {access_token}` to the API.
+**Flow:** Authorization code with **PKCE** for both public and confidential clients. Confidential clients also authenticate at the token endpoint with a client secret or certificate. After login, the token endpoint returns an **access token** whose **`aud`** (audience) is the target API—not the client app's ID. The **access token version** (and thus typical `aud` format) is controlled by the **resource API's** configuration (`accessTokenAcceptedVersion` / `requestedAccessTokenVersion`), not by whether the client calls the v1.0 or v2.0 token endpoint—either path can issue either format depending on that setting. **Version 1** tokens often use the API's **Application ID URI** (`api://…`) as `aud`; **version 2** tokens often use the API registration's **client ID (GUID)**. Validate against what Entra actually issues for each API registration. The client sends `Authorization: Bearer {access_token}` to the API.
 
 **Scopes:** Request the narrowest delegated scopes the API exposes (e.g., `api://{api-app-id}/User.Read`). The API maps scopes (and optional claims) to authorization logic. Sign-in scopes (`openid`, `profile`, `email`) come from OIDC; **resource scopes** authorize API calls.
 
@@ -74,16 +74,16 @@ sequenceDiagram
 
 Detailed checklists and Entra field names live in [07 — Key configurations](./07-key-configurations.md). For API access, confirm at minimum:
 
-- **Application ID URI** — stable identifier used in scope names (`api://…/ScopeName`); on v1/legacy tokens `aud` is often this URI, but on v2 `aud` is often the API's client ID GUID—do not assume URI always equals `aud`
+- **Application ID URI** — stable identifier used in scope names (`api://…/ScopeName`); whether `aud` is this URI or the API's client ID GUID depends on the API's **access token version** (`accessTokenAcceptedVersion` / `requestedAccessTokenVersion`), not the token endpoint path—do not assume URI always equals `aud`
 - **Scopes (delegated)** — exposed permissions for user-delegated access (Pattern A and OBO downstream)
 - **App roles / application permissions** — for client credentials (Pattern B) and admin-consented app-only access
 - **Authorized client applications** — optional preauthorization for trusted clients; can suppress consent prompts, not the sole permission gate for token issuance
-- **Audience validation** — API rejects tokens whose `aud` or `scp`/`roles` do not match its registration and endpoint version
+- **Audience validation** — API rejects tokens whose `aud` or `scp`/`roles` do not match its registration and configured access token version (not the token endpoint path)
 - **Middle-tier delegated permissions (Pattern C)** — middle-tier app granted and consented for downstream delegated scopes before OBO exchange (no permission named "OBO")
 
 ## Common pitfalls
 
-- **Wrong `aud`** — API validates against the Application ID URI while Entra issued a v2 token whose `aud` is the API client ID (or vice versa); every tier in OBO must accept the identifier Entra puts in the token for that endpoint version
+- **Wrong `aud`** — API validates against one identifier (Application ID URI or client ID GUID) while Entra issued a token whose `aud` matches the other form for that resource's access token version (or vice versa); every tier in OBO must accept the identifier Entra puts in the token for that API's configuration
 - **Using ID token as API bearer** — ID tokens are for the client (`aud` = client app); resource APIs require **access tokens** with API audience and scopes
 - **Missing downstream delegated permission or consent** — middle tier receives `invalid_grant` or downstream calls fail because the middle-tier registration lacks consented delegated permissions on the downstream resource, or consent was never granted before the OBO exchange
 - **Confusing app-only with delegated** — client credentials tokens have no user context and no delegated `scp` (though `sub` may identify the service principal); do not use Pattern B when audit or authorization requires the signed-in user (use Pattern A or C)
