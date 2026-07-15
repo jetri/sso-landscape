@@ -28,12 +28,12 @@ Checklists of **settings and artifacts** that must be known or configured before
 - **App roles (application permissions)** — roles for client-credentials and admin-consented app-only access
 - **Authorized client applications** — optional preauthorization list for trusted calling apps (suppresses consent prompts; not the sole permission gate)
 - **Admin consent grant** — tenant-wide consent record for delegated or application permissions
-- **`.default` scope** — `https://graph.microsoft.com/.default` or `api://{api-app-id}/.default` for client credentials and OBO exchange
+- **`.default` scope** — `https://graph.microsoft.com/.default` or `api://{api-app-id}/.default` for client credentials; for OBO exchange, prefer `.default` to obtain all consented delegated permissions (specific downstream scopes work only if already consented)
 - **Audience validation rules** — API accepts tokens whose `aud`, `iss`, signature, `scp`/`roles`, and lifetime match its registration and access token version
 - **Calling app delegated permissions** — scopes granted to the client app registration for Pattern A (user → API)
 - **Calling app application permissions** — app roles assigned to the client for Pattern B (daemon / service)
 - **OBO middle-tier registration** — confidential client representing the middle-tier API
-- **OBO middle-tier delegated permissions** — consented delegated permissions on the **downstream** API registration (no permission named "OBO"; exchange uses downstream `/.default`)
+- **OBO middle-tier delegated permissions** — consented delegated permissions on the **downstream** API registration (no permission named "OBO"; exchange typically requests downstream `/.default`, or specific scopes if already consented)
 - **OBO downstream Application ID URI and scopes** — downstream resource identifier and permissions the exchanged token must carry
 - **Client credential** — certificate (production) or secret (non-production) for confidential clients and OBO exchange
 

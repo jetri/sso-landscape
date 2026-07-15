@@ -41,7 +41,6 @@ flowchart LR
   APP --> API
   PU --> PIDP
   PIDP -.->|federation / B2B| E
-  E --> APP
 ```
 
 ## Network topology (logical)
