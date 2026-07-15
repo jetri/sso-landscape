@@ -18,6 +18,10 @@ Microsoft's on-premises directory service that stores user accounts, groups, and
 
 On-premises Windows Server role that acts as a federation IdP/STS for in-house applications backed by Active Directory. It issues WS-Federation or SAML tokens to relying party trusts and can federate outbound to cloud IdPs. Choose ADFS when the app, users, and trust model are still AD-centric; plan Entra migration when building new cloud-facing workloads.
 
+### Assertion
+
+A signed SAML structure that carries one or more claims about a subject, issued by the IdP and consumed by the SP at the ACS. Assertions bind authentication and attribute statements to a specific audience and lifetime. Do not conflate an assertion with a single claim—claims are the name–value statements inside the signed envelope.
+
 ### Audience (`aud`)
 
 A claim that names the intended recipient of a token—typically an API's Application ID URI or client ID. Resource servers must reject tokens whose `aud` does not match their configured identifier; wrong audience is a frequent integration defect. Align audience between token issuer settings and API validation logic before go-live.
@@ -26,9 +30,9 @@ A claim that names the intended recipient of a token—typically an API's Applic
 
 An external identity invited into your Entra tenant to access your applications without creating a full member account in your directory. The guest may authenticate via their home IdP (federated) or a one-time passcode, depending on trust configuration. Use B2B when partner org users need access to your apps; distinguish guests from native members for licensing, Conditional Access, and group assignment.
 
-### Claim / assertion
+### Claim
 
-A name–value statement about a subject (user, client, or session) carried inside a security token or SAML assertion. IdPs map directory attributes to outbound claims; applications rely on specific claims (UPN, email, groups, roles) for authorization decisions. Define required claims early so issuance rules and app expectations stay aligned across SAML, OIDC, and WS-Fed integrations.
+A name–value statement about a subject (user, client, or session) embedded in a token, SAML assertion, or OIDC ID token. IdPs map directory attributes to outbound claims; applications rely on specific claims (UPN, email, groups, roles) for authorization decisions. Define required claims early so issuance rules and app expectations stay aligned across SAML, OIDC, and WS-Fed integrations.
 
 ### Client credentials
 
@@ -52,7 +56,7 @@ The identifier (`iss` claim or SAML `<Issuer>`) that names the token-issuing aut
 
 ### OAuth 2.0
 
-An authorization framework for obtaining limited access to resources on behalf of a resource owner or client. It defines grants (authorization code, client credentials, refresh, OBO) and separates the authorization server from resource APIs. Pair OAuth 2.0 with OIDC when browser or native apps need both API access and standardized identity claims.
+An authorization framework for obtaining limited access to resources on behalf of a resource owner or client. It defines core grant types (authorization code, client credentials, refresh token, device code, and others) and separates the authorization server from resource APIs. Pair OAuth 2.0 with OIDC when browser or native apps need both API access and standardized identity claims.
 
 ### OIDC (OpenID Connect)
 
@@ -60,11 +64,15 @@ An identity layer on OAuth 2.0 that adds authentication semantics, the ID token,
 
 ### OBO (On-Behalf-Of)
 
-An OAuth 2.0 extension where a middle-tier API exchanges a user-delegated access token for a new token scoped to a downstream API, preserving user context across a call chain. Requires explicit permission grants and a confidential middle-tier registration. Use OBO when a web or API tier must call another API as the signed-in user without storing refresh tokens in the browser.
+An Entra ID and Microsoft identity platform extension pattern—not a core OAuth 2.0 grant type—where a middle-tier API uses token exchange or assertion mechanisms to obtain a downstream access token that preserves the signed-in user's context. Requires explicit permission grants and a confidential middle-tier registration. Use OBO when a web or API tier must call another API as the signed-in user without storing refresh tokens in the browser.
 
 ### Redirect URI
 
 The pre-registered callback URL where the authorization server sends the user (and authorization code or tokens) after login. Entra and other IdPs reject redirects that do not exactly match registered values, including trailing slashes and scheme. Register separate redirect URIs per environment and client type (web, SPA, native) to avoid cross-environment token leakage.
+
+### Refresh token
+
+An OAuth 2.0 credential issued alongside an access token that the client exchanges for new access tokens (and optionally a new refresh token) without re-prompting the user. Use refresh tokens for long-lived sessions in confidential clients that can store them securely; avoid issuing or storing refresh tokens in browser-only SPAs when a backend or token broker can hold them instead.
 
 ### Relying party (WS-Fed) / Relying party trust
 
@@ -100,7 +108,7 @@ An isolated Entra ID (Azure AD) directory boundary representing an organization,
 
 ### Token-signing certificate
 
-The asymmetric key pair an IdP uses to sign SAML assertions or JWTs so relying parties can verify authenticity. Applications and API gateways must trust the IdP's signing certificate (or metadata rollover schedule) before accepting tokens. Plan for certificate expiry and rollover; stale trust stores cause sudden, organization-wide authentication outages.
+The X.509 certificate an IdP publishes in federation metadata whose public key relying parties use to verify SAML assertion or JWT signatures; the IdP holds the matching private key separately in protected storage. Applications and API gateways must trust the IdP's signing certificate (or metadata rollover schedule) before accepting tokens. Plan for certificate expiry and rollover; stale trust stores cause sudden, organization-wide authentication outages.
 
 ### WAP (Web Application Proxy)
 
