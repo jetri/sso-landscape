@@ -25,11 +25,11 @@
 
 **When:** A signed-in user (or interactive login) should call an API **as themselves**. The client obtains an access token with **delegated permissions** (scopes) that represent what the user is allowed to do.
 
-**Flow:** Authorization code with **PKCE** (public clients such as SPAs) or authorization code with client secret/certificate (confidential web apps). After login, the token endpoint returns an **access token** whose **`aud`** (audience) is the target API's Application ID URI or client ID—not the client app's ID. The client sends `Authorization: Bearer {access_token}` to the API.
+**Flow:** Authorization code with **PKCE** for both public and confidential clients. Confidential clients also authenticate at the token endpoint with a client secret or certificate. After login, the token endpoint returns an **access token** whose **`aud`** (audience) is the target API—not the client app's ID. On the **Microsoft identity platform (v2)**, `aud` is often the API registration's **client ID (GUID)**; on **v1 / legacy** tokens, `aud` is often the API's **Application ID URI** (`api://…`). Validate against what Entra actually issues for your endpoint version. The client sends `Authorization: Bearer {access_token}` to the API.
 
 **Scopes:** Request the narrowest delegated scopes the API exposes (e.g., `api://{api-app-id}/User.Read`). The API maps scopes (and optional claims) to authorization logic. Sign-in scopes (`openid`, `profile`, `email`) come from OIDC; **resource scopes** authorize API calls.
 
-**Key configs (summary):** Application ID URI on the API registration; exposed scopes; **authorized client applications** (or admin consent) so the calling app may request those scopes; API-side **audience validation** must match the token's `aud`. See [07 — Key configurations](./07-key-configurations.md).
+**Key configs (summary):** Application ID URI on the API registration; exposed scopes; admin consent (or user consent where allowed) for the calling app to receive delegated scopes; **authorized client applications** as optional **preauthorization** for trusted clients (can suppress consent prompts—not the sole gate for token issuance); API-side **audience validation** must match the token's `aud`. See [07 — Key configurations](./07-key-configurations.md).
 
 **Relationship to browser SSO:** [03](./03-browser-sso-saml-oidc.md) describes OIDC sign-in; the same app registration often requests both `openid` and API scopes in one authorize request, or a BFF exchanges the code server-side and calls APIs with the access token.
 
@@ -39,7 +39,7 @@
 
 **Flow:** **Client credentials** grant. The confidential client authenticates to Entra with its client ID plus secret or certificate and requests an access token for the API. No user assertion is involved; authorization is based on **application permissions** (app roles) granted to the client, typically via `https://graph.microsoft.com/.default` or `api://{api-app-id}/.default` depending on the resource.
 
-**Permissions:** Admin consent for **application permissions** (app roles defined on the API registration). The resulting token represents the **application**, not a user. Downstream APIs must enforce app-only authorization explicitly (role checks, separate endpoints, or deny user-context assumptions).
+**Permissions:** Admin consent for **application permissions** (app roles defined on the API registration). The resulting token has **no user context**—no delegated `scp` claim—though it may still carry a `sub` identifying the service principal. Authorization is based on **application roles** (`roles`), not delegated scopes. Downstream APIs must enforce app-only authorization explicitly (role checks, separate endpoints, or deny user-context assumptions).
 
 **Key configs (summary):** API exposes app roles; calling app has application permissions assigned; client uses certificate auth in production. See [07 — Key configurations](./07-key-configurations.md).
 
@@ -66,27 +66,27 @@ sequenceDiagram
   Down->>Mid: Response
 ```
 
-**Requirements:** The middle-tier app registration must have permission to perform OBO to the downstream API (delegated permission on the downstream resource). The downstream API validates the new token's `aud`, scopes, and user identity claims as usual. OBO is an Entra / Microsoft identity platform pattern—not a generic OAuth grant; other IdPs may use different token-exchange mechanisms.
+**Requirements:** There is no permission literally named "OBO." The middle-tier app registration must have **delegated permissions** on the downstream API, with **prior user or admin consent** already granted for those scopes. On token exchange, the middle tier typically requests the downstream resource's `/.default` scope (all statically consented delegated permissions) or specific downstream scopes—not interactive consent mid-flow; OBO cannot prompt the user for new permissions. The downstream API validates the new token's `aud`, scopes, and user identity claims as usual. OBO is an Entra / Microsoft identity platform pattern—not a generic OAuth grant; other IdPs may use different token-exchange mechanisms.
 
-**Key configs (summary):** Middle-tier confidential registration; **OBO permission** to call downstream; downstream Application ID URI and scopes; authorized client apps as needed. See [07 — Key configurations](./07-key-configurations.md).
+**Key configs (summary):** Middle-tier confidential registration; **delegated permissions** on the downstream API (consented before exchange); downstream Application ID URI and scopes; authorized client apps as optional preauthorization where applicable. See [07 — Key configurations](./07-key-configurations.md).
 
 ## Key configurations
 
 Detailed checklists and Entra field names live in [07 — Key configurations](./07-key-configurations.md). For API access, confirm at minimum:
 
-- **Application ID URI** — stable identifier for the API; appears in token `aud` and scope names
+- **Application ID URI** — stable identifier used in scope names (`api://…/ScopeName`); on v1/legacy tokens `aud` is often this URI, but on v2 `aud` is often the API's client ID GUID—do not assume URI always equals `aud`
 - **Scopes (delegated)** — exposed permissions for user-delegated access (Pattern A and OBO downstream)
 - **App roles / application permissions** — for client credentials (Pattern B) and admin-consented app-only access
-- **Authorized client applications** — which client apps may request tokens for this API
-- **Audience validation** — API rejects tokens whose `aud` or `scp`/`roles` do not match its registration
-- **OBO permission on middle tier** — middle-tier app granted delegated access to downstream API for OBO exchange (Pattern C)
+- **Authorized client applications** — optional preauthorization for trusted clients; can suppress consent prompts, not the sole permission gate for token issuance
+- **Audience validation** — API rejects tokens whose `aud` or `scp`/`roles` do not match its registration and endpoint version
+- **Middle-tier delegated permissions (Pattern C)** — middle-tier app granted and consented for downstream delegated scopes before OBO exchange (no permission named "OBO")
 
 ## Common pitfalls
 
-- **Wrong `aud`** — API validates a different Application ID URI than Entra puts in the token; every tier in OBO must accept the token issued for its own identifier
+- **Wrong `aud`** — API validates against the Application ID URI while Entra issued a v2 token whose `aud` is the API client ID (or vice versa); every tier in OBO must accept the identifier Entra puts in the token for that endpoint version
 - **Using ID token as API bearer** — ID tokens are for the client (`aud` = client app); resource APIs require **access tokens** with API audience and scopes
-- **Missing OBO permission** — middle tier receives `invalid_grant` or downstream calls fail because the middle-tier registration lacks permission to exchange for the downstream resource
-- **Confusing app-only with delegated** — client credentials tokens carry no user `sub`; do not use Pattern B when audit or authorization requires the signed-in user (use Pattern A or C)
+- **Missing downstream delegated permission or consent** — middle tier receives `invalid_grant` or downstream calls fail because the middle-tier registration lacks consented delegated permissions on the downstream resource, or consent was never granted before the OBO exchange
+- **Confusing app-only with delegated** — client credentials tokens have no user context and no delegated `scp` (though `sub` may identify the service principal); do not use Pattern B when audit or authorization requires the signed-in user (use Pattern A or C)
 - **Scope vs role mismatch** — delegated flows use `scp`; app-only uses `roles`; APIs must check the claim type that matches the grant
 
 ## Related
