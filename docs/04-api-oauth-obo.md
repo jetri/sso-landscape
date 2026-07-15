@@ -91,7 +91,10 @@ Detailed checklists and Entra field names live in [07 — Key configurations](./
 
 ## Related
 
+- [01 — Enterprise SSO landscape](./01-sso-landscape.md)
+- [02 — Components and network topology](./02-components-and-topology.md)
 - [03 — Browser SSO (SAML and OIDC)](./03-browser-sso-saml-oidc.md)
 - [05 — Cross-federation](./05-cross-federation.md)
+- [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)
 - [07 — Key configurations](./07-key-configurations.md)
 - [Glossary](./glossary.md)

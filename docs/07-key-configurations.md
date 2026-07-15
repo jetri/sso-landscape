@@ -96,6 +96,8 @@ These settings affect whether federation alone is sufficient; full product guide
 
 ## Related
 
+- [01 — Enterprise SSO landscape](./01-sso-landscape.md)
+- [02 — Components and network topology](./02-components-and-topology.md)
 - [03 — Browser SSO (SAML / OIDC)](./03-browser-sso-saml-oidc.md)
 - [04 — API OAuth and OBO](./04-api-oauth-obo.md)
 - [05 — Cross-federation](./05-cross-federation.md)

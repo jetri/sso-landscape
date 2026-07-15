@@ -47,3 +47,13 @@ Shared definitions live in the [glossary](./glossary.md). Across protocols, the 
 - Full ADFS → Entra migration runbook (decision guidance and "prefer Entra when…" only)
 - Deep CIAM / Entra External ID for customer-facing identity (workforce B2B federation remains in scope)
 - Runnable SSO demo applications
+
+## Related
+
+- [02 — Components and network topology](./02-components-and-topology.md)
+- [03 — Browser SSO (SAML / OIDC)](./03-browser-sso-saml-oidc.md)
+- [04 — API OAuth and OBO](./04-api-oauth-obo.md)
+- [05 — Cross-federation](./05-cross-federation.md)
+- [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)
+- [07 — Key configurations](./07-key-configurations.md)
+- [Glossary](./glossary.md)

@@ -92,4 +92,5 @@ flowchart TB
 - [04 — API OAuth and OBO](./04-api-oauth-obo.md)
 - [05 — Cross-federation](./05-cross-federation.md)
 - [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)
+- [07 — Key configurations](./07-key-configurations.md)
 - [Glossary](./glossary.md)
