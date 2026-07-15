@@ -4,7 +4,7 @@
 
 Enterprise SSO spans two identity planes on the corporate side and a partner federation path for external users.
 
-**Modern Entra path:** Corporate users authenticate to **Entra ID**, which acts as the IdP. Enterprise applications and SaaS integrations register as **SPs or RPs**; first-party **APIs** validate tokens issued by Entra (OIDC ID tokens, OAuth access tokens). This is the default for new cloud and hybrid workloads.
+**Modern Entra path:** Corporate users authenticate to **Entra ID**, which acts as the IdP. Enterprise applications and SaaS integrations register as **SPs or RPs** and consume **OIDC ID tokens** for client-side identity; first-party **APIs** validate **OAuth access tokens** (audience, issuer, signature, scopes). This is the default for new cloud and hybrid workloads.
 
 **Legacy ADFS path:** Users whose sessions still originate in **Active Directory** authenticate through **ADFS** (STS / IdP). **In-house apps** on the corporate network act as relying parties and consume WS-Federation or SAML tokens. This path remains when apps, users, or trust relationships are AD-centric.
 
@@ -46,7 +46,7 @@ flowchart LR
 
 ## Network topology (logical)
 
-Traffic is **TLS everywhere on the wire**. Browser redirects carry authorization codes or SAML responses and cross **trust boundaries** between the user agent, IdP endpoints, and application origins—design redirect URIs and CORS accordingly. **Federation metadata** (SAML metadata, OIDC discovery, trust certificates) is **control-plane** configuration exchanged between IdPs and admins; it is not end-user traffic. **Tokens should not be forwarded unnecessarily**—APIs validate at the edge; avoid passing bearer tokens through additional hops or logging them.
+Traffic is **TLS everywhere on the wire**. Browser redirects carry authorization codes or SAML responses and cross **trust boundaries** between the user agent, IdP endpoints, and application origins—validate redirect URIs and registered reply URLs. **Federation metadata** (SAML metadata, OIDC discovery, JWKS, trust certificates) is **control-plane** configuration exchanged between IdPs and admins; it is not end-user traffic. Resource servers **validate bearer tokens locally** using signing keys from that metadata—routine API traffic does not call Entra on every request. **Tokens should not be forwarded unnecessarily**—APIs validate at the edge; avoid passing bearer tokens through additional hops or logging them.
 
 ```mermaid
 flowchart TB
@@ -70,14 +70,14 @@ flowchart TB
 
   BR -->|HTTPS redirect / tokens| ENT
   BR -->|HTTPS| SaaS
-  SaaS -->|validate tokens / SAML| ENT
+  SaaS -.->|federation metadata / JWKS| ENT
   BR -->|HTTPS| WAP
   WAP --> ADFSN
   BR -->|on-corp| ADFSN
   ADFSN --> DC
   ADFSN --> WEB
   BR -->|HTTPS| APIH
-  APIH -->|token validation vs Entra| ENT
+  APIH -.->|OIDC discovery / JWKS| ENT
   PEN -.->|federation trust metadata| ENT
 ```
 
