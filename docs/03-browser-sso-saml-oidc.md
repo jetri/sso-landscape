@@ -41,7 +41,7 @@ An enterprise registers the SaaS product in Entra as an **enterprise application
 
 For **OIDC**, the vendor supplies a redirect URI; Entra registers that URI and issues a **client ID** (and often a client secret for confidential web apps). The app requests scopes such as `openid profile email` for sign-in and additional API scopes if the same registration calls your APIs.
 
-For **SAML**, the vendor supplies an **entity ID** and **ACS URL**; Entra publishes a **reply URL** and **signing certificate** for the IdP side. Attribute mappings translate directory fields into SAML claim types the SaaS expects.
+For **SAML**, the vendor (SP) supplies an **entity ID** and **ACS URL** — you register that ACS (reply URL) in Entra. Entra publishes **IdP metadata**: SSO endpoint, issuer, and signing certificate. Attribute mappings translate directory fields into SAML claim types the SaaS expects.
 
 After successful authentication, the application creates its **own session** (cookie or server-side store). Federation tokens or assertions prove identity once at login; they are not a substitute for the app's session management or for API authorization.
 
@@ -66,13 +66,15 @@ sequenceDiagram
   App->>Entra: Token endpoint (code + PKCE verifier)
   Entra->>App: ID token + access token
   App->>Browser: Establish app session
-  Note over App,API: Later API call uses access token
-  Browser->>API: API request + Bearer access token
+  Note over App,API: Later API call uses access token (server-side)
+  App->>API: API request + Bearer access token
   API->>API: Validate aud, iss, signature, scopes
-  API->>Browser: Resource response
+  API->>App: Resource response
 ```
 
 The **ID token** tells the RP who signed in; the **access token** authorizes calls to APIs whose audience and scopes match. Do not send ID tokens to resource APIs—APIs expect access tokens with the correct `aud` and scopes (see [glossary — ID token](./glossary.md#id-token) and [glossary — access token](./glossary.md#access-token)).
+
+> **Note:** This sequence reflects a **confidential web app** or **BFF**: the server exchanges the code and holds the access token, then calls APIs on the user's behalf. For **public-client SPAs**, the browser completes the code+PKCE exchange, holds the access token, and calls the API directly.
 
 ## SAML SP-initiated (short)
 
