@@ -6,7 +6,8 @@ Checklists of **settings and artifacts** that must be known or configured before
 
 - **Tenant ID** — GUID of your Entra tenant
 - **Issuer URL** — `https://login.microsoftonline.com/{tenant-id}/v2.0` (OIDC) or SAML IdP entity ID from Entra federation metadata
-- **Application (client) ID** — OIDC app registration client ID, or enterprise application identifier for SAML
+- **Application (client) ID** — OIDC app registration client ID
+- **SP Identifier (Entity ID)** — SAML audience / trust identifier the IdP and SP agree on (not the OIDC client ID)
 - **Redirect URIs** (OIDC) — exact callback URLs the RP validates on return (scheme, host, path, trailing slash)
 - **Assertion Consumer Service (ACS) URL** (SAML) — reply URL where the SP receives the SAML response POST
 - **Logout URL** — federated sign-out endpoint registered on both sides when single logout is required
