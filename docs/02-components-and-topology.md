@@ -4,7 +4,7 @@
 
 Enterprise SSO spans two identity planes on the corporate side and a partner federation path for external users.
 
-**Modern Entra path:** Corporate users authenticate to **Entra ID**, which acts as the IdP. Enterprise applications and SaaS integrations register as **SPs or RPs** and consume **OIDC ID tokens** for client-side identity; first-party **APIs** validate **OAuth access tokens** (audience, issuer, signature, scopes). This is the default for new cloud and hybrid workloads.
+**Modern Entra path:** Corporate users authenticate to **Entra ID**, which acts as the IdP. Enterprise applications and SaaS integrations register as **SAML SPs** or **OIDC RPs**: SAML SPs consume **assertions**; OIDC RPs validate **ID tokens** to establish user sessions (often server-side). First-party **APIs** validate **OAuth access tokens** (audience, issuer, signature, scopes). This is the default for new cloud and hybrid workloads.
 
 **Legacy ADFS path:** Users whose sessions still originate in **Active Directory** authenticate through **ADFS** (STS / IdP). **In-house apps** on the corporate network act as relying parties and consume WS-Federation or SAML tokens. This path remains when apps, users, or trust relationships are AD-centric.
 
