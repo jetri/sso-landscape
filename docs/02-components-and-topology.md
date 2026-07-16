@@ -15,11 +15,30 @@ For diagrams scoped to a single decision pattern, open that pattern doc instead:
 
 Enterprise SSO spans a **modern Entra** plane, a **legacy ADFS** plane, and **cross-federation** when one company’s employees use another company’s portal.
 
-**Modern Entra path:** Users in a single tenant authenticate to **Entra ID** (IdP). Apps register as **SAML SPs** or **OIDC RPs**. APIs validate **OAuth access tokens**.
+**Modern Entra path (your org → SaaS or your apps):** **Your** employees (members of **your** Entra tenant) authenticate to **your** Entra ID. Apps register as **SAML SPs** or **OIDC RPs**. APIs validate **OAuth access tokens**. This **is federation** — your tenant trusts an external service provider (SaaS vendor) or your own app — but it is **not** cross-federation (see below).
 
 **Legacy ADFS path:** Users authenticate through **ADFS** against **Active Directory**. In-house apps are relying parties (WS-Fed / SAML).
 
-**Cross-federation (Company A → Company B):** **Company A employees** need **Company B’s website/portal**. They sign in only on **Company A’s Entra** login page. **Credentials never pass through Company B.** **Company A manages RBAC** (who among A’s employees may use the portal). There is **no separate partner-user login** — only A’s workforce authenticates, always at A.
+**Cross-federation (your org → third-party partner’s portal):** In this reference, **Company A = your organization** and **Company B = a third-party partner** (not a commercial SaaS product). **Your employees** need the **partner’s own website/portal** (built and hosted in the partner’s identity estate). They sign in only on **your Entra** login page. **Credentials never pass through the partner.** **You manage RBAC** for which of your employees may use the portal. There is **no separate partner-user login** — only your workforce authenticates, always at your Entra.
+
+### Federation vs cross-federation (both are federation)
+
+**Cross-federation is not a fallback for when a partner “can’t do federation.”** Both patterns use federation (SAML/OIDC trust). The choice is **which integration model** applies:
+
+| Question | **Browser SSO** (Modern Entra path) | **Cross-federation** (your org → partner portal) |
+|---|---|---|
+| **Who are the users?** | **Your** employees (your tenant members) | **Your** employees |
+| **What are they accessing?** | A **commercial SaaS product** (Salesforce, ServiceNow, Zoom, etc.) or **your own** app in your tenant | The **partner’s custom portal/app** hosted in the **partner’s** tenant |
+| **Who is the “third party”?** | **SaaS vendor** — sells a standard product with enterprise SSO | **Business partner** — operates their own line-of-business application |
+| **Where is federation configured?** | **Your** Entra: enterprise application to the vendor’s SP | **Trust between two orgs**: multi-tenant app (you consent + assign) or B2B + group sync |
+| **Who manages “who can access”?** | **You**, in **your** tenant (assign users/groups to the SaaS enterprise app) | **You**, in **your** tenant (multi-tenant assignment) or via synced groups — see [05](./05-cross-federation.md) |
+| **Typical login** | Your Entra login page | **Your** Entra login page (credentials stay with you) |
+
+**Choose Browser SSO (03)** when the third party is a **SaaS vendor** and you are federating your workforce into **their product** using the vendor’s standard enterprise SSO (gallery app, SAML/OIDC metadata they publish for customers).
+
+**Choose cross-federation (05)** when the third party is a **partner** and your workforce must use **the partner’s portal** (supplier hub, collaboration site, joint platform) with **your** Entra login, **no** credential passthrough to the partner, and **your** org controlling which employees get access.
+
+**Do not** pick cross-federation only because a partner “doesn’t support federation.” If they offer a SaaS product with enterprise SSO, use **Browser SSO**. Use **cross-federation** when the workload is the **partner’s tenant-hosted application**, not a shared commercial SaaS SKU.
 
 ```mermaid
 flowchart LR
@@ -59,7 +78,9 @@ flowchart LR
   ADFS --> IAPP
 ```
 
-## Cross-federation: Company A → Company B
+## Cross-federation: your organization → third-party partner
+
+In this reference: **Company A = your organization**, **Company B = a third-party partner** (supplier, customer, joint-venture counterparty) hosting **their own** portal — not a commercial SaaS vendor like Salesforce.
 
 Primary requirements for this path (detail in [05](./05-cross-federation.md)):
 

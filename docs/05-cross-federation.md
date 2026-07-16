@@ -1,4 +1,6 @@
-# Cross-federation: Company A employees → Company B portal
+# Cross-federation: your organization → third-party partner portal
+
+In this reference, **Company A = your organization** and **Company B = a third-party partner** (supplier, customer, alliance partner) that **hosts its own portal or application** in **its** Entra tenant — not a commercial SaaS product you subscribe to from a vendor gallery.
 
 ## Primary scenario (this reference)
 
@@ -9,18 +11,32 @@
 | 3 | Company A **credentials must not pass through** Company B | Yes — password/MFA stay at A |
 | 4 | **Company A manages RBAC** for which of its employees can use the portal | Yes — with multi-tenant assignment or A→B group sync (see below) |
 
-**No separate partner-user login.** The only people signing in are **Company A employees**. They authenticate exclusively at **Company A’s Entra**. Company B never presents a login form that collects A’s passwords, and there is no second “partner guest” credential prompt for this population.
+**No separate partner-user login.** The only people signing in are **your employees**. They authenticate exclusively at **your Entra**. The partner never presents a login form that collects your passwords.
+
+## Federation vs cross-federation — when to choose this pattern
+
+**Both Browser SSO and cross-federation are federation.** Cross-federation is **not** “use this when the partner can’t do federation.”
+
+| Situation | Pattern | Why |
+|---|---|---|
+| Your employees need **Salesforce, ServiceNow, Workday**, etc. | [03 — Browser SSO](./03-browser-sso-saml-oidc.md) | Commercial **SaaS vendor** with standard enterprise SSO; you add an enterprise app in **your** tenant |
+| Your employees need the **partner’s custom portal** (supplier hub, collaboration site) hosted in **partner’s** tenant | **This doc (05)** | **Tenant-to-tenant** (or multi-tenant app) integration; partner is not a SaaS SKU |
+| Partner offers SaaS **and** you need it | **03**, not 05 | If the product supports SAML/OIDC enterprise SSO, federate via **your** enterprise app — even though the partner “can do federation” |
+| You need **your** Entra login, credentials never at partner, **you** manage which employees access partner portal | **05** | Organizational and security requirements on top of federation mechanics |
+
+**Choose cross-federation when** the integration is **your workforce → partner’s application estate**, with the four requirements in the table below — not because SAML/OIDC is unavailable.
 
 ## Choose this when
 
-- Workforce users in **Tenant A** must use a portal owned by **Tenant B**
-- Sign-in must happen at **A’s Entra** (home IdP), not at B’s credential store
-- **A** must control day-to-day who among A’s employees is allowed into B’s portal
-- You need a trust model between two Entra tenants (or A’s Entra and B’s app)
+- **Your** workforce users must use a **partner-hosted** portal (not a gallery SaaS product)
+- Sign-in must happen at **your Entra** (home IdP), not at the partner’s credential store
+- **You** must control day-to-day who among your employees is allowed into the partner portal
+- You need a trust model between **your** Entra tenant and the **partner’s** application/tenant
 
 ## Prefer another pattern when
 
-- Users and the portal are in the **same** Entra tenant → [03 — Browser SSO](./03-browser-sso-saml-oidc.md) or [04 — API OAuth and OBO](./04-api-oauth-obo.md)
+- The third party is a **commercial SaaS vendor** (standard product + enterprise SSO) → [03 — Browser SSO](./03-browser-sso-saml-oidc.md) — **this is still federation**
+- Users and the app are in the **same** Entra tenant → [03](./03-browser-sso-saml-oidc.md) or [04](./04-api-oauth-obo.md)
 - On-prem ADFS / Active Directory only → [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)
 - Company A does **not** use Entra (Okta/Ping/ADFS only) → see [Alternate: non-Entra home IdP](#alternate-non-entra-home-idp-for-company-a) below
 

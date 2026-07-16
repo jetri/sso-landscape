@@ -18,20 +18,20 @@ Enterprise architects and application developers who need a **decision reference
 
 | Requirement signal | Likely pattern | Primary protocol(s) | Jump to |
 |---|---|---|---|
-| Browser login to SaaS / partner site | Browser SSO (Entra) | SAML 2.0 or OIDC | [03](./03-browser-sso-saml-oidc.md) |
+| Your employees → **commercial SaaS** (Salesforce, ServiceNow, etc.) | Browser SSO (Entra) | SAML 2.0 or OIDC | [03](./03-browser-sso-saml-oidc.md) |
 | Modern web/SPA calling your APIs | OIDC + OAuth | Auth code (+ PKCE), tokens to API | [03](./03-browser-sso-saml-oidc.md), [04](./04-api-oauth-obo.md) |
 | Service/daemon calling APIs (no user) | App-only | Client credentials | [04](./04-api-oauth-obo.md) |
 | API needs user context via another API | Delegated chain | OAuth On-Behalf-Of (OBO) | [04](./04-api-oauth-obo.md) |
-| Company A employees access Company B portal; login at A Entra; A manages RBAC | Cross-federation (A → B) | Multi-tenant app or B2B + sync | [05](./05-cross-federation.md) |
+| Your employees → **partner’s custom portal**; login at your Entra; you manage RBAC; credentials not at partner | Cross-federation | Multi-tenant app or B2B + sync | [05](./05-cross-federation.md) |
 | In-house app SSO against on-prem AD (legacy) | ADFS + Active Directory | WS-Fed and/or SAML 2.0 | [06](./06-legacy-adfs-ad.md) |
 
 ## Pattern catalog (summary)
 
-- **Browser SSO (Entra):** Sign users into SaaS or partner websites via Entra enterprise applications using SAML 2.0 or OIDC—see [03](./03-browser-sso-saml-oidc.md); component and network context in [02](./02-components-and-topology.md); must-configure items in [07](./07-key-configurations.md).
+- **Browser SSO (Entra):** Federate **your** employees into **commercial SaaS** or your own apps via enterprise applications (SAML/OIDC)—see [03](./03-browser-sso-saml-oidc.md). This **is** federation; use it when the third party is a **SaaS vendor**, not cross-federation.
 - **OIDC + OAuth (web/SPA + APIs):** Modern first-party apps authenticate users with OIDC and call APIs with delegated OAuth tokens (authorization code + PKCE)—see [03](./03-browser-sso-saml-oidc.md) and [04](./04-api-oauth-obo.md); topology in [02](./02-components-and-topology.md); configs in [07](./07-key-configurations.md).
 - **App-only (client credentials):** Daemons and background services obtain access tokens without a signed-in user—see [04](./04-api-oauth-obo.md); topology in [02](./02-components-and-topology.md); configs in [07](./07-key-configurations.md).
 - **Delegated chain (OBO):** A middle-tier API exchanges the user's token for a downstream API token that preserves user context—see [04](./04-api-oauth-obo.md); topology in [02](./02-components-and-topology.md); configs in [07](./07-key-configurations.md).
-- **Cross-federation (A → B):** Company A employees access Company B’s portal, sign in only at Company A Entra (credentials never through B), and Company A manages RBAC—see [05](./05-cross-federation.md); topology in [02](./02-components-and-topology.md#cross-federation-company-a--company-b); configs in [07](./07-key-configurations.md).
+- **Cross-federation:** **Your** employees access a **third-party partner’s** custom portal (partner-hosted app), sign in at **your** Entra, credentials never through the partner, **you** manage RBAC—see [05](./05-cross-federation.md). Not a fallback when SaaS federation exists; use when the workload is the **partner’s tenant-hosted application**.
 - **Legacy ADFS + Active Directory:** In-house applications on the corporate identity plane authenticate against on-prem ADFS backed by AD—see [06](./06-legacy-adfs-ad.md); legacy path in [02](./02-components-and-topology.md); ADFS configs in [07](./07-key-configurations.md).
 
 ## Terminology
