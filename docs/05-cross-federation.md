@@ -133,11 +133,11 @@ Primary happy path for **Pattern 1 (multi-tenant)** — login page is Company A 
 
 ```mermaid
 sequenceDiagram
-  actor Employee as Company A employee
+  actor Employee as "Company A employee"
   participant Browser
-  participant Portal as Company B portal
-  participant AEntra as Company A Entra
-  participant BEntra as Company B Entra
+  participant Portal as "Company B portal"
+  participant AEntra as "Company A Entra"
+  participant BEntra as "Company B Entra"
 
   Employee->>Browser: Open Company B portal
   Browser->>Portal: GET protected resource
