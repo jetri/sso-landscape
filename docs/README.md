@@ -12,15 +12,15 @@ This reference helps enterprise architects and application developers map an SSO
 ## Reading paths
 
 - **Architect:** README → [01 — SSO landscape](./01-sso-landscape.md) → [02 — Components and topology](./02-components-and-topology.md) → [05 — Cross-federation](./05-cross-federation.md) → [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md) (if on-prem) → [07 — Key configurations](./07-key-configurations.md)
-- **Developer:** README → [01 — SSO landscape](./01-sso-landscape.md) (skim) → [03 — Browser SSO (SAML / OIDC)](./03-browser-sso-saml-oidc.md) or [04 — API OAuth and OBO](./04-api-oauth-obo.md) (or [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)) → [07 — Key configurations](./07-key-configurations.md) → [05 — Cross-federation](./05-cross-federation.md) if partner users
+- **Developer:** README → [01 — SSO landscape](./01-sso-landscape.md) (skim) → [03 — Browser SSO (SAML / OIDC)](./03-browser-sso-saml-oidc.md) or [04 — API OAuth and OBO](./04-api-oauth-obo.md) (or [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)) → [07 — Key configurations](./07-key-configurations.md) → [05 — Cross-federation](./05-cross-federation.md) if Company A employees access a Company B portal
 
 ## Document index
 
 - [01 — SSO landscape](./01-sso-landscape.md) — Protocol map, decision table, and pattern catalog for mapping requirements to SSO approaches.
-- [02 — Components and topology](./02-components-and-topology.md) — Entra, ADFS/AD, and partner federation components with Mermaid topology diagrams.
+- [02 — Components and topology](./02-components-and-topology.md) — Entra, ADFS/AD, and Company A → Company B portal cross-federation topology diagrams.
 - [03 — Browser SSO (SAML / OIDC)](./03-browser-sso-saml-oidc.md) — Entra enterprise-app sign-in for SaaS and websites via SAML 2.0 or OpenID Connect.
 - [04 — API OAuth and OBO](./04-api-oauth-obo.md) — Delegated access, client credentials, and On-Behalf-Of chains for protected APIs.
-- [05 — Cross-federation](./05-cross-federation.md) — B2B guests, Entra-to-Entra collaboration, and federated partner IdPs (Okta, Ping, ADFS).
+- [05 — Cross-federation](./05-cross-federation.md) — Company A employees → Company B portal: A Entra login, no credential passthrough, A-managed RBAC.
 - [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md) — On-prem ADFS relying-party SSO for in-house apps backed by Active Directory.
 - [07 — Key configurations](./07-key-configurations.md) — Consolidated must-configure checklists (tenant URLs, certs, scopes, trust identifiers).
 - [Glossary](./glossary.md) — Definitions for IdP, SP/RP, claims, B2B, OBO, and other terms used across the reference.

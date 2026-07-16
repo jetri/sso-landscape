@@ -37,39 +37,34 @@ Checklists of **settings and artifacts** that must be known or configured before
 - **OBO downstream Application ID URI and scopes** — downstream resource identifier and permissions the exchanged token must carry
 - **Client credential** — certificate (production) or secret (non-production) for confidential clients and OBO exchange
 
-## Entra ID — cross-federation
+## Entra ID — cross-federation (Company A → Company B portal)
 
-Workforce B2B cross-federation uses **SAML 2.0 or WS-Federation** for partner IdPs (Okta, Ping, ADFS, and similar). Inbound **OIDC identity provider federation** is an Entra External ID (CIAM) feature — **out of scope** for workforce tenant direct federation. Federation is an **authentication method for B2B guests**, not a replacement for guest objects in your tenant.
+Primary scenario: **Company A employees** access **Company B’s portal**, sign in only at **Company A Entra** (credentials never through B), and **Company A manages RBAC**. No separate partner-user login. Detail: [05](./05-cross-federation.md).
 
-### Option A — native Entra-to-Entra B2B
+### Pattern 1 — Multi-tenant app (A owns day-to-day RBAC)
 
-- **B2B collaboration** — guest or external-member onboarding path (invitation, self-service sign-up, or cross-tenant sync)
-- **Cross-tenant access settings** — inbound/outbound B2B trust (for example, acceptance of home-tenant MFA and device claims); does not replace native B2B authentication routing
-- **Guest `userType`** — partner users commonly arrive as `Guest` principals in your tenant
-- **Application assignment for guests** — enterprise applications and app registrations must permit guest access where partner users need entry
-- **RBAC ownership (who manages “who can access”)** — default single-tenant B2B: resource tenant assigns apps/roles. If the **home** org must manage day-to-day access: use a **multi-tenant** app (home-tenant user/group assignment) or **cross-tenant sync** of home groups into the resource tenant with a one-time app assignment on the synced group. See [05 — Where RBAC is configured](./05-cross-federation.md#where-rbac-is-configured)
+- **Company B:** multi-tenant app registration; redirect URIs / ACS; optional app-role definitions  
+- **Company A:** admin consent to B’s app; **user/group assignment** on the enterprise app in Tenant A  
+- **Sign-in:** authorize routed to **Company A Entra** — passwords/MFA stay at A  
 
-### Option B — B2B with federated SAML/WS-Fed partner IdP
+### Pattern 2 — B2B + A→B group sync (A owns group membership)
 
-- **Federation metadata URL** — partner SAML metadata or WS-Fed federation metadata; refresh after partner certificate rollover
-- **Issuer URI** — inbound issuer / entity ID the partner IdP asserts; must match partner configuration exactly
-- **Federation routing pattern** — one of:
-  - **Verified-domain map** — partner email domain mapped to the federated IdP (domain verified in the **partner home** tenant, **not** in your resource tenant)
-  - **Unverified-domain map** — domain association without DNS verification in your tenant (with Microsoft constraints)
-  - **Domainless SAML** — issuer association plus `domain_hint` (or equivalent login hint) where applicable
-- **Inbound claim requirements (SAML 2.0)** — **persistent NameID** and matchable **email address** from the partner IdP
-- **Inbound claim requirements (WS-Fed)** — **ImmutableID** and **emailaddress** from the partner IdP
-- **Partner IdP signing certificate** — current signing cert from federation metadata; update trust on partner rollover
-- **Redemption order** — federation vs. Microsoft Entra priority during invitation redemption for verified-domain scenarios
+- **Company B:** enterprise app; B2B / cross-tenant access; **one-time** assignment of synced A groups to the portal  
+- **Company A:** security groups for portal access; **cross-tenant synchronization** (A → B); MFA/CA for A workforce  
+- **Sign-in:** still redirects to **Company A Entra** for the login page  
 
-Federation trust does **not** offer free-form inbound claim transform rules for groups, roles, or `preferred_username`. Configure **application outbound claims** separately for what Entra emits **after** B2B sign-in completes.
+### Alternate — Company A uses non-Entra IdP (Okta / Ping / ADFS)
 
-### Shared cross-federation settings
+- **Federation metadata URL**, **issuer URI**, SAML/WS-Fed inbound claim requirements (persistent NameID + email, or ImmutableID + emailaddress)  
+- Inbound **OIDC IdP federation** for workforce tenants is **out of scope** (Entra External ID / CIAM)  
+- See [05 — Alternate](./05-cross-federation.md#alternate-non-entra-home-idp-for-company-a)
 
-- **Application outbound claims** — UPN, email, display name, group, or role claims in Entra-issued SAML assertions, OIDC ID tokens, or access tokens
-- **Conditional Access scoping** — policies targeting `All guest and external users` or specific guest groups (distinct from outbound claim configuration)
-- **External identity licensing** — monthly active user billing for B2B guests where applicable
-- **Reply URL / redirect URI** — ACS URL or OIDC redirect URI on your apps unchanged by upstream federation; exact-match rules still apply
+### Shared settings
+
+- **Reply URL / redirect URI** — ACS or OIDC redirect on B’s portal; exact-match rules still apply  
+- **Application outbound claims** — what B’s portal needs after sign-in  
+- **Conditional Access** — A for workforce auth; B may apply resource CA and trust A MFA via cross-tenant access  
+- **Do not** build a password form on B’s portal for A employees  
 
 ## ADFS / Active Directory — in-house RP
 

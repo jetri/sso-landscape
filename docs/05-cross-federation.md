@@ -1,229 +1,198 @@
-# Cross-federation and external identities
+# Cross-federation: Company A employees → Company B portal
+
+## Primary scenario (this reference)
+
+| # | Requirement | Outcome |
+|---|---|---|
+| 1 | **Company A** employees need access to **Company B** website/portal | Yes |
+| 2 | Employees must see the **Company A Entra ID** login page | Yes |
+| 3 | Company A **credentials must not pass through** Company B | Yes — password/MFA stay at A |
+| 4 | **Company A manages RBAC** for which of its employees can use the portal | Yes — with multi-tenant assignment or A→B group sync (see below) |
+
+**No separate partner-user login.** The only people signing in are **Company A employees**. They authenticate exclusively at **Company A’s Entra**. Company B never presents a login form that collects A’s passwords, and there is no second “partner guest” credential prompt for this population.
 
 ## Choose this when
 
-- Users **belong to another organization** and need access to **your** Entra-integrated applications
-- Partner users must **authenticate at their home IdP** — partner **Entra** (via B2B/cross-tenant access) or a **SAML 2.0 / WS-Fed** authority like **Okta**, **Ping**, or **ADFS** — rather than receiving credentials in your directory
-- You are deciding **which authentication method** a B2B guest population should use to sign in: native Entra-to-Entra B2B, or B2B backed by a federated SAML/WS-Fed identity provider
+- Workforce users in **Tenant A** must use a portal owned by **Tenant B**
+- Sign-in must happen at **A’s Entra** (home IdP), not at B’s credential store
+- **A** must control day-to-day who among A’s employees is allowed into B’s portal
+- You need a trust model between two Entra tenants (or A’s Entra and B’s app)
 
 ## Prefer another pattern when
 
-- **All users are members of your tenant only** (no external org identities) → [03 — Browser SSO](./03-browser-sso-saml-oidc.md) or [04 — API OAuth and OBO](./04-api-oauth-obo.md)
-- **Pure on-prem ADFS internal** workloads backed by Active Directory, not Entra as the resource-tenant IdP → [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)
+- Users and the portal are in the **same** Entra tenant → [03 — Browser SSO](./03-browser-sso-saml-oidc.md) or [04 — API OAuth and OBO](./04-api-oauth-obo.md)
+- On-prem ADFS / Active Directory only → [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)
+- Company A does **not** use Entra (Okta/Ping/ADFS only) → see [Alternate: non-Entra home IdP](#alternate-non-entra-home-idp-for-company-a) below
 
-## Where cross-federation sits
+## How the four requirements are met
 
-Your Entra tenant remains the **resource-tenant IdP** for your applications: SAML SPs, OIDC RPs, and OAuth APIs still trust **your** issuer and signing keys.
+```mermaid
+flowchart LR
+  subgraph CompanyA["Company A - home tenant"]
+    Emp[Company A employees]
+    AEntra[Company A Entra ID]
+    RBAC[A manages users / groups / app assignment]
+  end
 
-**Important:** in a workforce tenant, SAML/WS-Fed IdP federation is not an alternative *to* B2B — it is an **authentication method used by B2B collaboration**. A partner user still ends up with an identity in **your** tenant (typically a guest, or an external member via cross-tenant sync); federation only changes **where that identity's credentials are verified** (the partner's IdP instead of Entra-managed credentials or a one-time passcode). Self-service sign-up and entitlement management can remove the need for an administrator to send a manual invitation, but they still create and manage a guest lifecycle in your directory — federation does not, by itself, grant domain-wide access with no account in your tenant.
+  subgraph CompanyB["Company B - portal owner"]
+    Portal[Company B website / portal]
+    BEntra[Company B Entra - app registration / B2B]
+  end
 
-Partner users authenticate at their **home IdP** — the partner's own Entra tenant (via native B2B / cross-tenant access) or a federated SAML/WS-Fed provider such as Okta, Ping, or ADFS. Entra then completes the B2B guest sign-in and issues the same SAML assertions, OIDC tokens, or OAuth access tokens your apps already expect from member users.
+  Emp -->|1 open portal| Portal
+  Portal -->|2 redirect for sign-in| AEntra
+  Emp -->|2 authenticate - credentials stay at A| AEntra
+  AEntra -.->|3 tokens / assertions only - no password to B| Portal
+  RBAC -->|4 who may access| Emp
+  RBAC -.->|4 assignment or synced groups| BEntra
+```
 
-See the focused diagrams below for this pattern; the landscape-wide **Partner federation** view is also in [02 — Components and network topology](./02-components-and-topology.md#high-level-components).
+| Requirement | Mechanism |
+|---|---|
+| **1. Access B’s portal** | Portal is an Entra-integrated app (OIDC RP or SAML SP) that Company A’s employees can reach |
+| **2. A’s Entra login page** | Sign-in is routed to **Tenant A** (multi-tenant home-tenant auth, or B2B redirect to home Entra). Users never enter passwords on B’s UI |
+| **3. Credentials never through B** | Browser redirects to `login.microsoftonline.com` for **A**. B receives only post-auth **tokens/assertions** (and optional authorization codes). Secrets stay with A |
+| **4. A manages RBAC** | Prefer **Pattern 1** (multi-tenant app + assignment in A). Or **Pattern 2** (B2B + cross-tenant sync of A’s groups into B, with one-time app assignment in B) |
+
+Landscape diagrams: [02 — Components and network topology](./02-components-and-topology.md#cross-federation-company-a--company-b).
 
 ## Components and network topology
-
-Focused views for **cross-federation / B2B** into **your** Entra tenant. Landscape-wide diagrams live in [02](./02-components-and-topology.md).
 
 ### High-level components
 
 ```mermaid
 flowchart LR
-  PU[Partner users]
-  Home[Home IdP - partner Entra or SAML/WS-Fed IdP]
-  YourE[Your Entra tenant - resource IdP + B2B]
-  APP[Your apps - SP / RP]
-  API[Your APIs - optional]
+  Emp[Company A employees]
+  A[Company A Entra - home IdP]
+  B[Company B Entra]
+  Portal[Company B portal - SP / RP]
 
-  PU --> Home
-  Home -.->|B2B auth method| YourE
-  YourE --> APP
-  APP -.->|access token| API
+  Emp --> A
+  A -.->|auth result / token path| B
+  B --> Portal
+  Emp -->|use portal after sign-in| Portal
 ```
+
+- **Company A Entra:** authenticates employees; holds passwords/MFA; A admins assign users/groups (Pattern 1) or manage groups that sync to B (Pattern 2)
+- **Company B Entra:** hosts the app registration / enterprise app and (for B2B) guest or synced identities; does **not** collect A credentials
+- **Company B portal:** trusts Entra-issued identity for the signed-in user; implements app sessions as in [03](./03-browser-sso-saml-oidc.md)
 
 ### Network topology (logical)
 
 ```mermaid
 flowchart TB
-  subgraph Partner_side["Partner side"]
-    PBR[Partner user browser]
-    HOME[Home IdP endpoints - partner Entra or Okta/Ping/ADFS]
+  subgraph CompanyA_net["Company A"]
+    BR[Employee browser]
+    AENT[Company A Entra endpoints]
   end
 
-  subgraph Your_side["Your side"]
-    YENT[Your Entra - login.microsoftonline.com]
-    YAPP[Your SaaS / website]
-    YAPI[Your API hosts]
+  subgraph CompanyB_net["Company B"]
+    Portal[Company B website / portal]
+    BENT[Company B Entra endpoints]
   end
 
-  PBR -->|HTTPS sign-in| YENT
-  YENT -->|redirect to home IdP| HOME
-  PBR -->|authenticate at home| HOME
-  HOME -.->|federation / B2B trust metadata| YENT
-  PBR -->|complete B2B / code or SAML to app| YAPP
-  YAPP -.->|IdP metadata / JWKS| YENT
-  PBR -->|HTTPS Bearer| YAPI
-  YAPI -.->|JWKS| YENT
+  BR -->|HTTPS open portal| Portal
+  Portal -->|HTTPS redirect to authorize| AENT
+  BR -->|HTTPS A Entra login - password MFA stay here| AENT
+  AENT -.->|control plane trust / multi-tenant or B2B| BENT
+  AENT -->|HTTPS auth code or SAML path via browser| Portal
+  Portal -.->|OIDC discovery / JWKS as needed| AENT
+  Portal -.->|optional B2B guest path metadata| BENT
 ```
 
-Partner authentication happens at the **home IdP**; your apps still trust **your** Entra issuer for assertions and tokens after B2B completes.
+**Credential boundary:** the only place Company A passwords and MFA secrets are entered is **Company A’s Entra**. Company B’s portal and Tenant B see redirects and tokens — not A’s credentials.
 
-## Where RBAC is configured
+## Patterns that satisfy requirement 4 (A-managed RBAC)
 
-### Scenario: Company A employees → Company B portal
+### Pattern 1 — Multi-tenant app (recommended when A must own assignment)
 
-| Requirement | Possible? | How |
-|---|---|---|
-| 1. A employees access B’s website/portal | Yes | B2B into B’s tenant, or B’s **multi-tenant** app consented in A |
-| 2. Login page is **Company A Entra** | Yes | Native Entra↔Entra B2B (or home-realm discovery for multi-tenant apps) redirects to **A’s** authorize/login endpoints |
-| 3. A credentials never pass through B | Yes | Password/MFA stay at **A**. B receives federation results / tokens after A authenticates — not the user’s secret |
-| 4. **Company A manages RBAC** of who among A’s employees can use the portal | **Yes, with the right pattern** — not the default single-tenant B2B-only model |
+1. Company B registers the portal as a **multi-tenant** Entra application  
+2. Company A admin **consents** the app into Tenant A (once)  
+3. Company A assigns **users/groups in Tenant A** to that enterprise app  
+4. Employees open B’s portal → authenticate at **A’s Entra** → portal session established  
 
-**Requirements 1–3** are the normal Entra B2B / multi-tenant sign-in path. **Requirement 4** needs an explicit design choice:
+**RBAC:** day-to-day “who can use the portal” is managed entirely in **Company A**. Company B owns the application code and optional app-role *definitions*; A owns *who is assigned*.
 
-#### Pattern 1 — Multi-tenant app (A manages day-to-day assignment)
+### Pattern 2 — B2B into B + cross-tenant sync (A owns group membership)
 
-Company B publishes the portal as a **multi-tenant** Entra application. Company A’s admin **consents** once. After that, **Company A** assigns users/groups to that enterprise app **in Tenant A** (who is allowed to sign in). Users authenticate at **A**; the app receives tokens whose home tenant is A. This is the cleanest fit when “A owns who can use B’s portal.”
+1. Company B hosts a **single-tenant** (or B2B-capable) enterprise app  
+2. Company A employees appear in Tenant B as **guests** or **synced external members**  
+3. **Cross-tenant synchronization** (A → B): A manages security groups in **A**; membership syncs into **B**  
+4. Company B performs a **one-time** assignment of the synced group to the portal  
+5. Sign-in still redirects to **Company A Entra** (credentials stay at A)  
 
-Company B still owns the **application** (code, roles defined on the app registration, optional app-role definitions). Company A owns **which of A’s users are assigned**.
+**RBAC:** A manages join/leave via groups in A. B does not need to edit assignment for every hire/leave.
 
-#### Pattern 2 — B2B guest into B’s single-tenant app + A-managed group membership
+### What does *not* meet requirement 4
 
-Company B hosts a **single-tenant** enterprise app. Company A users become **guests** (or synced external members) in **Tenant B**. Credentials still authenticate at **A** (1–3 satisfied).
+Classic **single-tenant app in B + B2B guests** with **no** multi-tenant consent and **no** A→B group sync: A owns login (requirements 1–3), but **B** must assign each guest/group in B’s directory. That fails requirement 4.
 
-For **A to manage who has access** without B’s admins editing assignment daily:
+## Sequence: Company A employee → Company B portal
 
-- **Cross-tenant synchronization** (A → B): A manages security-group membership in **A**; those users/groups sync into **B**; B does a **one-time** assignment of the synced group to the portal (or Azure RBAC). Day-to-day join/leave is administered in **A**.
-- Or **entitlement management** / access packages in B with A as a connected organization (approvals can involve A sponsors) — B still hosts the package; A can drive membership decisions.
-
-Without sync or a multi-tenant app, **B** must assign guests/groups in B’s directory — A cannot directly administer B’s enterprise-app RBAC from A’s admin center.
-
-#### What is *not* true by default
-
-In classic **single-tenant app + B2B guests** with no sync and no multi-tenant consent model, **B** (resource tenant) owns app assignment, app roles, and Azure RBAC in B’s subscriptions. A only owns authentication. That satisfies 1–3 but **not** 4.
-
-### Quick reference
-
-| Concern | Typical owner |
-|---|---|
-| Login UI / passwords / MFA enrollment | **Home tenant (A)** |
-| Credentials on the wire to B | **Never** — only post-auth tokens/assertions |
-| Who may use B’s portal (day-to-day) | **A** if multi-tenant assignment or A→B group sync; otherwise **B** |
-| Azure RBAC inside B’s Azure subscriptions | **B** (assignments on objects that exist in B, including synced groups) |
-| Conditional Access on B’s apps | **B** (may *trust* A’s MFA/device claims via cross-tenant access) |
-
-**Practical rule:** A proves *identity*; authorization for B’s resources is evaluated where the **app assignment and role data** live — either in **A** (multi-tenant enterprise-app assignment) or in **B** (guest/synced-group assignment). Design for requirement 4 explicitly; do not assume B2B alone puts RBAC under A.
-
-## Option A — Entra B2B collaboration, native Entra-to-Entra
-
-**B2B collaboration** brings an external identity into your Entra tenant to access your applications, as a **guest** (most common) or, when the partner org enables it, an **external member** via cross-tenant synchronization. The object lives in your directory; the partner user does not become a full native member of your tenant.
-
-**When the partner also uses Entra ID, prefer native B2B / cross-tenant access over configuring SAML federation between the two tenants.** Entra↔Entra collaboration uses **B2B collaboration** — which routes partner users to authenticate at their home tenant — together with **cross-tenant access settings** that govern inbound and outbound B2B trust between tenants. Inbound trust can accept MFA and device claims from the partner's home tenant; outbound settings control how your users access the partner tenant. Cross-tenant access settings alone do not replace that native B2B sign-in path. Onboarding still requires B2B invitation or self-service sign-up — not a custom SAML/WS-Fed identity provider. Treating "two Entra tenants" as a SAML-federation problem is a common misconfiguration.
-
-**Lifecycle:** An administrator (or automated invitation flow) invites the partner user by email, or the partner self-service signs up (optionally gated by entitlement management) if your tenant allows it for their domain. The guest **redeems** the invitation — typically by signing in at their **home Entra tenant**, or via email one-time passcode when the partner has no Entra tenant and no federation is configured. Self-service and entitlement management reduce *manual* invite effort, but the resulting guest object, its lifecycle, and its access reviews still live in your tenant like any other B2B account.
-
-**Authentication:** For **Entra↔Entra**, the guest signs in at **partner Entra**; native B2B collaboration routes authentication to the home tenant automatically, and cross-tenant access settings govern what inbound trust (for example, MFA and device claims from the home tenant) applies. Your apps see a guest (or external member) principal in **your** tenant with claims issued by your Entra. Partners without their own Entra tenant (Okta, Ping, ADFS, or similar) cannot use this native path — see Option B.
-
-**When it fits:** Named partner individuals or small populations; you want **per-user visibility** in your tenant (assignment, audit, group membership); the partner org also uses Entra ID.
-
-## Option B — B2B with a federated SAML/WS-Fed identity provider
-
-When the partner org does **not** use Entra ID, configure their IdP — **Okta**, **Ping Identity**, **ADFS**, or another **SAML 2.0 or WS-Fed** authority — as a federated identity provider under Entra's external identity providers. Entra then routes matching B2B guest sign-ins to the partner IdP instead of using an Entra-managed password or email one-time passcode. **How** Entra associates a guest with that federation trust is configurable: **verified-domain mapping** is the most common pattern, but Entra also supports **unverified-domain** federation (with constraints) and **domainless SAML** routing via issuer association plus `domain_hint` where applicable.
-
-This is still **B2B**: Entra still creates and manages a guest object for each partner user in your tenant. Federation only changes the guest's **authentication method** — where their credentials are verified — not whether an account exists or whether an invitation/onboarding step happens.
-
-**Protocol scope:** **SAML 2.0 and WS-Fed** are the protocols for workforce B2B direct federation with an arbitrary partner IdP (Okta, Ping, ADFS, and similar). Google workspace federation is a separate, vendor-specific path. Inbound **OIDC identity provider federation** is an **Entra External ID** (CIAM / external-tenant) feature — **out of scope** for this workforce reference; do not treat it as an available pattern for federating partner workforce IdPs in a corporate tenant.
-
-**Partner is another Entra tenant?** Don't configure it as a SAML/WS-Fed identity provider — use Option A (native B2B / cross-tenant access) instead.
-
-**Key concepts (configuration level):**
-
-- **Federation metadata URL** — partner publishes SAML metadata (or WS-Fed federation metadata); your Entra imports endpoints and signing certificates
-- **Issuer URI** — the identifier your Entra expects on inbound assertions (`Issuer` / entity ID); must match partner configuration exactly
-- **Federation routing (choose a pattern)** — multiple association models exist; pick the one that fits partner onboarding and domain control:
-  - **Verified domain** — map a partner email domain (e.g., `partner.com`) to the federated IdP; guests whose UPN/email matches that domain are redirected to the partner sign-in flow. Most common when the partner domain is already verified in **their** (home) Entra tenant. Microsoft requires the domain **not** be verified in **your** (resource) tenant — do not add DNS verification for the partner domain in your tenant to enable this trust. Issuer URI must still match partner IdP configuration exactly. **Redemption order** applies during **invitation redemption** — it prioritizes identity providers when more than one could apply (notably SAML/WS-Fed federation vs. Microsoft Entra for verified domains), rather than acting as a general routing selector among all federation patterns on every sign-in.
-  - **Unverified domain** — map a partner email domain **without** verifying it in your tenant first; supported with constraints (for example, domain-conflict rules and sign-in limitations may apply). Use when domain verification is impractical but domain-based routing still fits.
-  - **Domainless SAML (issuer + hint)** — associate the trust primarily by **issuer** / metadata and route sign-in using **issuer association** plus **`domain_hint`** (or equivalent login hints) where applicable, without relying on a verified domain map. Confirm current Microsoft direct-federation guidance for your scenario before assuming domainless routing.
-- **Inbound claim requirements** — Entra's federation trust expects fixed inbound claims per Microsoft documentation, protocol-specific: for **SAML 2.0**, a **persistent NameID** and a matchable **email address**; for **WS-Fed**, **ImmutableID** and **emailaddress**. These let Entra create or match the guest object. Federation configuration does not offer free-form inbound transform rules for groups, roles, or `preferred_username` the way an app's outbound claims do. Configure **your applications** separately to consume the claims Entra puts in the SAML assertion, OIDC ID token, or access token **after** B2B sign-in completes (see [03 — Browser SSO](./03-browser-sso-saml-oidc.md) and [07 — Key configurations](./07-key-configurations.md))
-
-Any federation routing pattern still results in guest objects for that population — it changes *how* guests authenticate and can reduce reliance on per-user email OTP, but it does not remove the guest account, its assignment requirements, or its lifecycle review.
-
-## B2B vs federated IdP (decision)
-
-Both rows below are **B2B collaboration**. The decision is which **authentication method** the guest's home-tenant sign-in uses, and separately, which **onboarding path** creates the guest object.
-
-| Aspect | Option A — native Entra home tenant | Option B — federated SAML/WS-Fed home IdP |
-|---|---|---|
-| **Home IdP / protocol** | Partner's own Entra tenant; cross-tenant access settings | Okta, Ping, ADFS, or other SAML 2.0 / WS-Fed authority configured as a federated identity provider |
-| **Applies when** | Partner org uses Entra ID | Partner org does **not** use Entra ID |
-| **Who manages credentials** | Partner org, in their Entra tenant | Partner org, in their SAML/WS-Fed IdP |
-| **You configure** | Cross-tenant access settings (inbound/outbound B2B trust; inbound can accept home-tenant MFA and device claims) | Federated IdP metadata, issuer, and a federation routing pattern: verified domain (common), unverified domain (with constraints), or domainless SAML via issuer association + `domain_hint` where applicable |
-| **Guest object in your tenant** | Yes — created by invitation, self-service sign-up, or cross-tenant sync | Yes — created on first sign-in or invitation; federation just points its auth at the partner IdP |
-
-**Onboarding path (orthogonal to the table above, applies to either option):** a guest object can arrive via administrator invitation, self-service sign-up (optionally gated by entitlement management), or automated provisioning — independent of whether that guest's sign-in ultimately uses native Entra routing or a federated SAML/WS-Fed IdP.
-
-## Sequence: partner user into your Entra app
+Primary happy path for **Pattern 1 (multi-tenant)** — login page is Company A Entra; no partner/guest credential prompt:
 
 ```mermaid
 sequenceDiagram
-  actor PartnerUser
+  actor Employee as Company A employee
   participant Browser
-  participant App as Your app (SAML SP or OIDC RP)
-  participant YourEntra as Your Entra tenant (B2B guest)
-  participant HomeIdP as Home IdP (partner Entra via B2B, or federated SAML/WS-Fed IdP)
+  participant Portal as Company B portal
+  participant AEntra as Company A Entra
+  participant BEntra as Company B Entra
 
-  PartnerUser->>Browser: Open your app
-  Browser->>App: Request
-  App->>Browser: Redirect to Your Entra (SAML AuthnRequest or OIDC /authorize)
-  Browser->>YourEntra: Sign-in as guest
-  YourEntra->>Browser: Redirect to Home IdP (guest's configured authentication method)
-  Browser->>HomeIdP: Authenticate with partner credentials
-  HomeIdP->>Browser: Assertion or ID token back toward Your Entra
-  Browser->>YourEntra: Complete guest sign-in at Your Entra
-  alt App is OIDC / OAuth
-    YourEntra->>Browser: Redirect with authorization code
-    Browser->>App: Authorization code
-    App->>YourEntra: Exchange code for tokens (back channel)
-    YourEntra->>App: ID token / access token
-  else App is SAML
-    YourEntra->>Browser: SAML Response (auto-submit form)
-    Browser->>App: POST to Assertion Consumer Service (ACS)
-  end
-  App->>Browser: Signed-in session for guest
+  Employee->>Browser: Open Company B portal
+  Browser->>Portal: GET protected resource
+  Portal->>Browser: Redirect to authorize (multi-tenant / home tenant A)
+  Browser->>AEntra: Company A Entra login page
+  Note over Browser,AEntra: Password and MFA stay at Company A - never posted to B
+  Employee->>AEntra: Authenticate
+  AEntra->>Browser: Auth success (code or tokens per protocol)
+  Browser->>Portal: Complete sign-in (OIDC code or SAML ACS)
+  Portal->>Portal: Validate token/assertion; create app session
+  Note over AEntra,BEntra: A already assigned user/group to app in Tenant A
+  Portal->>Browser: Signed-in session
 ```
 
-Your Entra does not uniformly hand the browser "tokens" for every app: **OIDC/OAuth apps** redeem an authorization code for tokens over the back channel, while **SAML apps** receive a SAML response posted by the browser to the ACS endpoint — the same protocol mechanics as [03 — Browser SSO](./03-browser-sso-saml-oidc.md). Only the **upstream authentication path** (the redirect to the home IdP before Your Entra completes sign-in) is added by cross-federation; the app-facing protocol is unchanged.
+For **Pattern 2 (B2B)**, the browser may briefly touch Company B’s Entra to start guest/B2B routing, then redirects to **Company A Entra** for the actual login page. Credentials still never enter Company B’s application.
 
 ## Key configurations
 
-Detailed checklists and Entra field names live in [07 — Key configurations](./07-key-configurations.md). For cross-federation, confirm at minimum:
+See also [07 — Key configurations](./07-key-configurations.md).
 
-- **Federation metadata URL** — partner SAML metadata or WS-Fed federation metadata; refresh after partner certificate rollover
-- **Issuer URI** — inbound issuer matches partner IdP entity ID (`Issuer` / entity ID); mismatch causes immediate sign-in failure
-- **Federation routing / domain association** — confirm which pattern applies for Option B: **verified-domain** map (most common; partner domain verified in the **home** tenant, **not** in your resource tenant), **unverified-domain** map (with constraints), or **domainless SAML** via issuer association + `domain_hint` where applicable; for Option A (Entra↔Entra), **native B2B collaboration** routes authentication to the partner's home tenant — **cross-tenant access settings** control inbound/outbound B2B trust (for example, whether MFA or device claims from the home tenant are accepted), not the authentication routing path itself
-- **Inbound claim requirements** — partner IdP must send the required inbound claims Entra expects: **persistent NameID** and email for **SAML 2.0**, or **ImmutableID** and **emailaddress** for **WS-Fed**; validate partner configuration against Microsoft's direct-federation claim requirements rather than assuming arbitrary inbound remap rules
-- **Application outbound claims** — after B2B sign-in, configure each enterprise application or app registration for the UPN, email, display name, group, or role claims your **applications** need in **Entra-issued** assertions or tokens. Conditional Access evaluates sign-in conditions separately; it does not consume application outbound claim configuration
-- **`userType`, licensing, and Conditional Access are distinct settings** — B2B collaboration users commonly default to `userType = Guest`, but licensing (e.g., external identity monthly active user billing), Conditional Access scoping (`All guest and external users` vs specific users/groups), and group assignment are each configured independently; don't assume setting `userType` alone determines every policy outcome
-- **Application assignment** — enterprise applications and app registrations must allow guest access where partner users need entry; review default member-only assignments
-- **RBAC in your tenant** — assign guests to security groups, **app roles**, and (if needed) **Azure RBAC** in **your** Entra / Azure subscriptions; do not expect the partner IdP to authorize access to your resources
+**Company A (home — owns login + RBAC):**
+
+- Tenant / issuer for employee sign-in  
+- User and group lifecycle for employees allowed to use B’s portal  
+- **Pattern 1:** admin consent to B’s multi-tenant app; **user/group assignment** on the enterprise app in A  
+- **Pattern 2:** groups (and sync configuration) that drive who appears in B; MFA/Conditional Access for A’s workforce  
+
+**Company B (portal owner — does not collect A credentials):**
+
+- App registration / enterprise app for the portal (multi-tenant for Pattern 1, or single-tenant + B2B for Pattern 2)  
+- Redirect URIs / ACS, logout URL, outbound claims the portal needs  
+- **Pattern 2:** B2B / cross-tenant access settings; one-time assignment of **synced** A groups to the portal  
+- Conditional Access on B’s side if required (may trust A’s MFA claims via cross-tenant access)  
+
+**Both:**
+
+- TLS everywhere; validate redirect/ACS URLs  
+- No expectation that A passwords traverse B’s portal or B’s custom login UI  
 
 ## Common pitfalls
 
-- **Verifying the partner domain in your resource tenant** — for verified-domain SAML/WS-Fed direct federation, the partner domain must be verified in the **partner's (home) Entra tenant**, not in your tenant; adding DNS verification for `partner.com` in your resource tenant conflicts with Microsoft's direct-federation requirements
-- **Assuming verified domain is mandatory** — verified-domain mapping is the most common B2B direct-federation pattern, but Entra also supports unverified-domain federation (with constraints) and domainless SAML via issuer association + `domain_hint` where applicable; choose the routing pattern that matches partner domain control and onboarding constraints
-- **Assuming federation removes the guest account** — SAML/WS-Fed IdP federation is an authentication method *for* B2B guests, not a replacement for one; any federation routing pattern still produces guest objects with a lifecycle, assignment, and access reviews in your tenant
-- **Configuring SAML federation between two Entra tenants** — when the partner already has Entra ID, use native B2B collaboration and cross-tenant access settings (Option A), not a custom SAML/WS-Fed identity provider; treating Entra↔Entra as a generic SAML federation problem is unnecessary and harder to maintain
-- **Expecting OIDC inbound IdP federation in a workforce tenant** — workforce B2B direct federation is **SAML 2.0 / WS-Fed only**. Inbound OIDC IdP federation belongs to **Entra External ID** (CIAM) scenarios and is **out of scope** here; do not plan a partner Okta/Ping federation around generic OIDC in a corporate workforce tenant
-- **Treating guests like members** — guest users commonly default to `userType = Guest`, but licensing, Conditional Access, and group limits are separate settings; policies that assume `Member` user type or that assume `userType` alone drives every outcome can block partner access silently or at CA evaluation
-- **Issuer mismatch** — partner rotates IdP certificates or changes entity ID without updating your federation trust; validate the issuer/entity ID and signing cert on every partner change
-- **Assuming inbound federation claim transforms** — Entra's trust with the partner IdP enforces required inbound claims (SAML: persistent NameID and email; WS-Fed: ImmutableID and emailaddress), not arbitrary remap rules. If your app expects `preferred_username`, a specific SAML NameID format, or group claims, configure **outbound** claims on the Entra enterprise application or app registration for what Entra emits **after** guest sign-in — do not expect the federation trust itself to rewrite partner assertions freely
-- **Confusing cross-tenant access settings with B2B routing** — cross-tenant access settings control inbound/outbound B2B trust between tenants (for example, whether to accept MFA or device claims from a partner's home tenant); native B2B collaboration is what routes partner Entra users to authenticate at their home tenant. Conditional Access evaluates sign-in conditions; it does not consume application outbound token claim configuration
-- **Reply URL and redirect URI unchanged** — federation fixes upstream auth but your app's ACS/redirect URI must still match registration; partner federation does not relax SP/RP URL exact-match rules
+- **Assuming B2B alone puts RBAC under A** — without multi-tenant assignment or A→B sync, B owns who can open the portal  
+- **Building a login form on B’s portal for A users** — breaks requirements 2 and 3; always redirect to A’s Entra  
+- **SAML federation between two Entra tenants** for this scenario — prefer native multi-tenant or B2B/cross-tenant; do not invent Entra↔Entra SAML as the default  
+- **Verifying A’s email domain in Tenant B** to “force” federation — usually wrong for Entra↔Entra; use multi-tenant or B2B routing instead  
+- **Expecting A’s Azure RBAC to grant access inside B’s Azure subscriptions** — Azure RBAC in B’s cloud is still assigned in B (often onto synced groups from A)  
+
+## Alternate: non-Entra home IdP for Company A
+
+If Company A uses **Okta, Ping, or ADFS** (not Entra) while Company B’s portal is on Entra, use **B2B with a federated SAML/WS-Fed IdP** so A employees still authenticate at A’s IdP and credentials stay at A. Day-to-day RBAC for “who may access B’s portal” then typically needs group sync, entitlement packages, or assignment processes agreed between A and B — it is **not** the same as Pattern 1 multi-tenant assignment in Entra A. Protocol details (metadata, issuer, NameID/ImmutableID) are in [07](./07-key-configurations.md) and older workforce federation notes; this primary scenario assumes **both orgs use Entra**.
 
 ## Related
 
 - [01 — Enterprise SSO landscape](./01-sso-landscape.md)
-- [02 — Components and network topology](./02-components-and-topology.md)
+- [02 — Components and network topology](./02-components-and-topology.md#cross-federation-company-a--company-b)
 - [03 — Browser SSO (SAML / OIDC)](./03-browser-sso-saml-oidc.md)
 - [04 — API OAuth and OBO](./04-api-oauth-obo.md)
 - [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)

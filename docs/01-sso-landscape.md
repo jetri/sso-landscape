@@ -22,7 +22,7 @@ Enterprise architects and application developers who need a **decision reference
 | Modern web/SPA calling your APIs | OIDC + OAuth | Auth code (+ PKCE), tokens to API | [03](./03-browser-sso-saml-oidc.md), [04](./04-api-oauth-obo.md) |
 | Service/daemon calling APIs (no user) | App-only | Client credentials | [04](./04-api-oauth-obo.md) |
 | API needs user context via another API | Delegated chain | OAuth On-Behalf-Of (OBO) | [04](./04-api-oauth-obo.md) |
-| Users from partner org (their IdP or Entra) | Cross-federation | B2B + SAML/OIDC federation | [05](./05-cross-federation.md) |
+| Company A employees access Company B portal; login at A Entra; A manages RBAC | Cross-federation (A → B) | Multi-tenant app or B2B + sync | [05](./05-cross-federation.md) |
 | In-house app SSO against on-prem AD (legacy) | ADFS + Active Directory | WS-Fed and/or SAML 2.0 | [06](./06-legacy-adfs-ad.md) |
 
 ## Pattern catalog (summary)
@@ -31,7 +31,7 @@ Enterprise architects and application developers who need a **decision reference
 - **OIDC + OAuth (web/SPA + APIs):** Modern first-party apps authenticate users with OIDC and call APIs with delegated OAuth tokens (authorization code + PKCE)—see [03](./03-browser-sso-saml-oidc.md) and [04](./04-api-oauth-obo.md); topology in [02](./02-components-and-topology.md); configs in [07](./07-key-configurations.md).
 - **App-only (client credentials):** Daemons and background services obtain access tokens without a signed-in user—see [04](./04-api-oauth-obo.md); topology in [02](./02-components-and-topology.md); configs in [07](./07-key-configurations.md).
 - **Delegated chain (OBO):** A middle-tier API exchanges the user's token for a downstream API token that preserves user context—see [04](./04-api-oauth-obo.md); topology in [02](./02-components-and-topology.md); configs in [07](./07-key-configurations.md).
-- **Cross-federation:** Partner-organization users access your apps via B2B guests or inbound IdP federation (SAML/OIDC)—see [05](./05-cross-federation.md); federation topology in [02](./02-components-and-topology.md); configs in [07](./07-key-configurations.md).
+- **Cross-federation (A → B):** Company A employees access Company B’s portal, sign in only at Company A Entra (credentials never through B), and Company A manages RBAC—see [05](./05-cross-federation.md); topology in [02](./02-components-and-topology.md#cross-federation-company-a--company-b); configs in [07](./07-key-configurations.md).
 - **Legacy ADFS + Active Directory:** In-house applications on the corporate identity plane authenticate against on-prem ADFS backed by AD—see [06](./06-legacy-adfs-ad.md); legacy path in [02](./02-components-and-topology.md); ADFS configs in [07](./07-key-configurations.md).
 
 ## Terminology

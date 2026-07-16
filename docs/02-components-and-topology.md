@@ -1,6 +1,6 @@
 # Components and network topology
 
-This page is the **landscape-wide** view: modern Entra, legacy ADFS, and cross-federation on one canvas. Use it for stakeholder orientation across the whole estate.
+This page is the **landscape-wide** view: modern Entra, legacy ADFS, and the **Company A → Company B portal** cross-federation scenario on one canvas. Use it for stakeholder orientation across the whole estate.
 
 For diagrams scoped to a single decision pattern, open that pattern doc instead:
 
@@ -8,30 +8,30 @@ For diagrams scoped to a single decision pattern, open that pattern doc instead:
 |---|---|
 | Browser SSO (SAML / OIDC) | [03 — Browser SSO](./03-browser-sso-saml-oidc.md#components-and-network-topology) |
 | API OAuth / OBO | [04 — API OAuth and OBO](./04-api-oauth-obo.md#components-and-network-topology) |
-| Cross-federation | [05 — Cross-federation](./05-cross-federation.md#components-and-network-topology) |
+| Cross-federation (A → B portal) | [05 — Cross-federation](./05-cross-federation.md#components-and-network-topology) |
 | Legacy ADFS / AD | [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md#components-and-network-topology) |
 
 ## High-level components (all patterns)
 
-Enterprise SSO spans two identity planes on the corporate side and a partner federation path for external users.
+Enterprise SSO spans a **modern Entra** plane, a **legacy ADFS** plane, and **cross-federation** when one company’s employees use another company’s portal.
 
-**Modern Entra path:** Corporate users authenticate to **Entra ID**, which acts as the IdP. Enterprise applications and SaaS integrations register as **SAML SPs** or **OIDC RPs**: SAML SPs consume **assertions**; OIDC RPs validate **ID tokens** to establish user sessions (often server-side). First-party **APIs** validate **OAuth access tokens** (audience, issuer, signature, scopes). This is the default for new cloud and hybrid workloads.
+**Modern Entra path:** Users in a single tenant authenticate to **Entra ID** (IdP). Apps register as **SAML SPs** or **OIDC RPs**. APIs validate **OAuth access tokens**.
 
-**Legacy ADFS path:** Users whose sessions still originate in **Active Directory** authenticate through **ADFS** (STS / IdP). **In-house apps** on the corporate network act as relying parties and consume WS-Federation or SAML tokens. This path remains when apps, users, or trust relationships are AD-centric.
+**Legacy ADFS path:** Users authenticate through **ADFS** against **Active Directory**. In-house apps are relying parties (WS-Fed / SAML).
 
-**Partner federation side path:** **Partner users** sign in at their home **Partner IdP** (Okta, Ping, or partner Entra). Inbound federation or B2B routes them to your **Entra ID** tenant, which then issues tokens to your applications—the same SP/RP/API boxes as the modern path.
+**Cross-federation (Company A → Company B):** **Company A employees** need **Company B’s website/portal**. They sign in only on **Company A’s Entra** login page. **Credentials never pass through Company B.** **Company A manages RBAC** (who among A’s employees may use the portal). There is **no separate partner-user login** — only A’s workforce authenticates, always at A.
 
 ```mermaid
 flowchart LR
-  subgraph Users
-    U[Corporate users]
-    PU[Partner users]
+  subgraph CompanyA["Company A"]
+    Emp[Company A employees]
+    AEntra[Company A Entra - home IdP]
   end
 
-  subgraph Modern["Modern path"]
+  subgraph Modern["Same-tenant modern path"]
     E[Entra ID - IdP]
     APP[Apps / SaaS - SP or RP]
-    API[Protected APIs - resource servers]
+    API[Protected APIs]
   end
 
   subgraph Legacy["Legacy path"]
@@ -40,19 +40,72 @@ flowchart LR
     IAPP[In-house apps - relying parties]
   end
 
-  subgraph Partners["Cross-federation"]
-    PIDP[Partner IdP - Okta / Ping / partner Entra]
+  subgraph CompanyB["Company B"]
+    BEntra[Company B Entra]
+    Portal[Company B portal - SP / RP]
   end
 
-  U --> E
-  U --> AD
-  AD --> ADFS
-  ADFS --> IAPP
+  Emp --> AEntra
+  AEntra -.->|tokens only - no A passwords to B| BEntra
+  BEntra --> Portal
+  Emp -->|use portal after A sign-in| Portal
+
+  Emp -.->|same-tenant apps| E
   E --> APP
   APP --> API
-  PU --> PIDP
-  PIDP -.->|federation / B2B| E
+
+  Emp --> AD
+  AD --> ADFS
+  ADFS --> IAPP
 ```
+
+## Cross-federation: Company A → Company B
+
+Primary requirements for this path (detail in [05](./05-cross-federation.md)):
+
+1. A employees access B’s portal  
+2. Login UI is **Company A Entra**  
+3. A credentials **do not** pass through B  
+4. **A manages RBAC** for its employees (multi-tenant app assignment in A, or A→B group sync)
+
+```mermaid
+flowchart LR
+  Emp[Company A employees]
+  A[Company A Entra]
+  RBAC[A RBAC - groups / app assignment]
+  B[Company B Entra]
+  Portal[Company B website / portal]
+
+  RBAC --> Emp
+  Emp -->|authenticate| A
+  A -.->|auth result only| B
+  B --> Portal
+  Emp --> Portal
+```
+
+### Network topology (Company A → Company B)
+
+```mermaid
+flowchart TB
+  subgraph A_side["Company A"]
+    BR[Employee browser]
+    AENT[Company A Entra - login.microsoftonline.com]
+  end
+
+  subgraph B_side["Company B"]
+    Portal[Company B website / portal]
+    BENT[Company B Entra]
+  end
+
+  BR -->|HTTPS| Portal
+  Portal -->|redirect authorize| AENT
+  BR -->|A Entra login - credentials stay here| AENT
+  AENT -.->|multi-tenant or B2B trust| BENT
+  AENT -->|auth code / SAML path| Portal
+  Portal -.->|JWKS / metadata| AENT
+```
+
+**Credential boundary:** passwords and MFA for Company A employees are entered only at **Company A Entra**. Company B receives redirects and tokens — never A’s secrets. No second “partner login” step for this population.
 
 ## Network topology (logical, all patterns)
 
@@ -63,8 +116,9 @@ flowchart TB
   subgraph Internet
     BR[User browser]
     SaaS[External SaaS / website]
-    PEN[Partner IdP endpoints]
-    ENT[Entra endpoints - login.microsoftonline.com]
+    AENT[Company A Entra endpoints]
+    BENT[Company B Entra endpoints]
+    ENT[Entra endpoints - same-tenant apps]
   end
 
   subgraph DMZ["DMZ / edge optional"]
@@ -81,6 +135,8 @@ flowchart TB
   BR -->|HTTPS redirect / tokens| ENT
   BR -->|HTTPS| SaaS
   SaaS -.->|federation metadata / JWKS| ENT
+  BR -->|Company A login for B portal| AENT
+  AENT -.->|trust / multi-tenant or B2B| BENT
   BR -->|HTTPS| WAP
   WAP --> ADFSN
   BR -->|on-corp| ADFSN
@@ -88,19 +144,18 @@ flowchart TB
   ADFSN --> WEB
   BR -->|HTTPS| APIH
   APIH -.->|OIDC discovery / JWKS| ENT
-  PEN -.->|federation trust metadata| ENT
 ```
 
 ## How to use these diagrams
 
-**Architects** use this landscape view to show how modern Entra, legacy ADFS, and partner federation coexist. For a single initiative, switch to the **pattern-specific** component and network diagrams in [03](./03-browser-sso-saml-oidc.md)–[06](./06-legacy-adfs-ad.md) so stakeholders only see the actors and zones that apply. **Developers** map their application to the **SP/RP** or **API** boxes on the matching pattern page.
+**Architects** use this landscape view to show how same-tenant Entra, legacy ADFS, and **Company A → Company B** portal access coexist. For the A→B initiative alone, use the [cross-federation section above](#cross-federation-company-a--company-b) or the focused diagrams in [05](./05-cross-federation.md). **Developers** map their application to the **SP/RP** or **API** boxes on the matching pattern page.
 
 ## Related
 
 - [01 — Enterprise SSO landscape](./01-sso-landscape.md)
 - [03 — Browser SSO (SAML / OIDC)](./03-browser-sso-saml-oidc.md)
 - [04 — API OAuth and OBO](./04-api-oauth-obo.md)
-- [05 — Cross-federation](./05-cross-federation.md)
+- [05 — Cross-federation (A → B portal)](./05-cross-federation.md)
 - [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)
 - [07 — Key configurations](./07-key-configurations.md)
 - [Glossary](./glossary.md)
