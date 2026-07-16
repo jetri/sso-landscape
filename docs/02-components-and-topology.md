@@ -1,6 +1,17 @@
 # Components and network topology
 
-## High-level components
+This page is the **landscape-wide** view: modern Entra, legacy ADFS, and cross-federation on one canvas. Use it for stakeholder orientation across the whole estate.
+
+For diagrams scoped to a single decision pattern, open that pattern doc instead:
+
+| Pattern | Focused component + network diagrams |
+|---|---|
+| Browser SSO (SAML / OIDC) | [03 — Browser SSO](./03-browser-sso-saml-oidc.md#components-and-network-topology) |
+| API OAuth / OBO | [04 — API OAuth and OBO](./04-api-oauth-obo.md#components-and-network-topology) |
+| Cross-federation | [05 — Cross-federation](./05-cross-federation.md#components-and-network-topology) |
+| Legacy ADFS / AD | [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md#components-and-network-topology) |
+
+## High-level components (all patterns)
 
 Enterprise SSO spans two identity planes on the corporate side and a partner federation path for external users.
 
@@ -43,7 +54,7 @@ flowchart LR
   PIDP -.->|federation / B2B| E
 ```
 
-## Network topology (logical)
+## Network topology (logical, all patterns)
 
 Traffic is **TLS everywhere on the wire**. Browser redirects carry authorization codes or SAML responses and cross **trust boundaries** between the user agent, IdP endpoints, and application origins—validate redirect URIs and registered reply URLs. **Federation metadata** (SAML metadata, OIDC discovery, JWKS, trust certificates) is **control-plane** configuration exchanged between IdPs and admins; it is not end-user traffic. Resource servers **validate bearer tokens locally** using signing keys from that metadata—routine API traffic does not call Entra on every request. **Tokens should not be forwarded unnecessarily**—APIs validate at the edge; avoid passing bearer tokens through additional hops or logging them.
 
@@ -82,7 +93,7 @@ flowchart TB
 
 ## How to use these diagrams
 
-**Architects** use these views in stakeholder reviews to show where identity trust lives, which network zones see redirects, and how modern Entra, legacy ADFS, and partner federation coexist. **Developers** map their application to the **SP/RP** or **API** boxes, then follow the pattern doc that matches their protocol (SAML/OIDC browser SSO, OAuth to APIs, or legacy WS-Fed/SAML to ADFS).
+**Architects** use this landscape view to show how modern Entra, legacy ADFS, and partner federation coexist. For a single initiative, switch to the **pattern-specific** component and network diagrams in [03](./03-browser-sso-saml-oidc.md)–[06](./06-legacy-adfs-ad.md) so stakeholders only see the actors and zones that apply. **Developers** map their application to the **SP/RP** or **API** boxes on the matching pattern page.
 
 ## Related
 

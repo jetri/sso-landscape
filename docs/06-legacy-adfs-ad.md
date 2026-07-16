@@ -5,7 +5,7 @@
 - **In-house applications** are already integrated with **ADFS** as the federation authority
 - The authoritative **identity store is on-premises Active Directory** — user accounts, groups, and password policy live in AD domain controllers
 - **WS-Federation or SAML 2.0 relying party trusts** already exist between ADFS and your corporate web apps
-- Users and apps remain **corp-network-centric** — sign-in traffic stays on the legacy identity plane described in [02 — Components and network topology](./02-components-and-topology.md)
+- Users and apps remain **corp-network-centric** — sign-in traffic stays on the legacy identity plane (see diagrams below and the landscape view in [02](./02-components-and-topology.md))
 
 ## Prefer another pattern when
 
@@ -24,6 +24,53 @@
 | ADFS (STS / IdP) | On-premises federation service that authenticates users against AD and issues WS-Fed or SAML tokens |
 | Active Directory | Authoritative on-prem directory — domain controllers validate credentials and supply attributes |
 | Web Application Proxy (optional) | Edge reverse proxy that publishes ADFS endpoints to the internet without exposing the farm directly |
+
+## Components and network topology
+
+Focused views for **legacy ADFS + Active Directory** in-house SSO. Landscape-wide diagrams (with Entra and partners) live in [02](./02-components-and-topology.md).
+
+### High-level components
+
+```mermaid
+flowchart LR
+  U[Corporate users]
+  AD[Active Directory]
+  ADFS[ADFS - STS / IdP]
+  APP[In-house apps - relying parties]
+
+  U --> AD
+  AD --> ADFS
+  ADFS --> APP
+```
+
+### Network topology (logical)
+
+```mermaid
+flowchart TB
+  subgraph Internet
+    ExtBR[Off-network browser]
+  end
+
+  subgraph DMZ["DMZ / edge optional"]
+    WAP[Web Application Proxy]
+  end
+
+  subgraph Corp["Corporate network"]
+    BR[On-corp browser]
+    DC[Domain controllers - AD]
+    ADFSN[ADFS farm]
+    WEB[In-house web apps]
+  end
+
+  ExtBR -->|HTTPS| WAP
+  WAP --> ADFSN
+  BR -->|on-corp HTTPS or WIA| ADFSN
+  ADFSN --> DC
+  ADFSN --> WEB
+  BR --> WEB
+```
+
+On-corp users often hit ADFS directly (WIA or forms); off-network users typically reach ADFS through **WAP** in a DMZ. Token-signing trust and federation metadata remain control-plane between ADFS and the relying party.
 
 ## Protocols
 

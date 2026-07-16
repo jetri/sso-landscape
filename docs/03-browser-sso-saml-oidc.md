@@ -21,6 +21,44 @@
 | External website / SaaS | **SP** (SAML) or **RP** (OIDC) — consumes federation result and establishes an application session |
 | Optional API | **Resource server** — validates OAuth **access tokens** for API calls (see [04](./04-api-oauth-obo.md)) |
 
+## Components and network topology
+
+Focused views for **browser SSO via Entra** only. Landscape-wide diagrams (Entra + ADFS + partners together) live in [02](./02-components-and-topology.md).
+
+### High-level components
+
+```mermaid
+flowchart LR
+  U[Corporate users]
+  E[Entra ID - IdP]
+  APP[Website / SaaS - SP or RP]
+  API[Optional protected API]
+
+  U --> E
+  E --> APP
+  APP -.->|access token| API
+```
+
+### Network topology (logical)
+
+```mermaid
+flowchart TB
+  subgraph Internet
+    BR[User browser]
+    SaaS[External SaaS / website]
+    ENT[Entra endpoints - login.microsoftonline.com]
+    APIH[Optional API hosts]
+  end
+
+  BR -->|HTTPS redirect / auth code or SAML| ENT
+  BR -->|HTTPS| SaaS
+  SaaS -.->|IdP metadata / JWKS| ENT
+  BR -->|HTTPS Bearer access token| APIH
+  APIH -.->|OIDC discovery / JWKS| ENT
+```
+
+Browser redirects cross the Entra ↔ app trust boundary; SaaS and APIs validate federation artifacts and access tokens **locally** using metadata/JWKS (control plane), not by calling Entra on every request.
+
 ## Protocols
 
 - Prefer **OIDC** for modern apps and first-party web/SPA workloads when both Entra and the vendor support it

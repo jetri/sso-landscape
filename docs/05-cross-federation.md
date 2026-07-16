@@ -19,7 +19,68 @@ Your Entra tenant remains the **resource-tenant IdP** for your applications: SAM
 
 Partner users authenticate at their **home IdP** — the partner's own Entra tenant (via native B2B / cross-tenant access) or a federated SAML/WS-Fed provider such as Okta, Ping, or ADFS. Entra then completes the B2B guest sign-in and issues the same SAML assertions, OIDC tokens, or OAuth access tokens your apps already expect from member users.
 
-See the **Partner federation** subgraph in [02 — Components and network topology](./02-components-and-topology.md#high-level-components): partner IdP endpoints exchange trust metadata with your Entra tenant; browser redirects cross that boundary before your app receives a session.
+See the focused diagrams below for this pattern; the landscape-wide **Partner federation** view is also in [02 — Components and network topology](./02-components-and-topology.md#high-level-components).
+
+## Components and network topology
+
+Focused views for **cross-federation / B2B** into **your** Entra tenant. Landscape-wide diagrams live in [02](./02-components-and-topology.md).
+
+### High-level components
+
+```mermaid
+flowchart LR
+  PU[Partner users]
+  Home[Home IdP - partner Entra or SAML/WS-Fed IdP]
+  YourE[Your Entra tenant - resource IdP + B2B]
+  APP[Your apps - SP / RP]
+  API[Your APIs - optional]
+
+  PU --> Home
+  Home -.->|B2B auth method| YourE
+  YourE --> APP
+  APP -.->|access token| API
+```
+
+### Network topology (logical)
+
+```mermaid
+flowchart TB
+  subgraph Partner_side["Partner side"]
+    PBR[Partner user browser]
+    HOME[Home IdP endpoints - partner Entra or Okta/Ping/ADFS]
+  end
+
+  subgraph Your_side["Your side"]
+    YENT[Your Entra - login.microsoftonline.com]
+    YAPP[Your SaaS / website]
+    YAPI[Your API hosts]
+  end
+
+  PBR -->|HTTPS sign-in| YENT
+  YENT -->|redirect to home IdP| HOME
+  PBR -->|authenticate at home| HOME
+  HOME -.->|federation / B2B trust metadata| YENT
+  PBR -->|complete B2B / code or SAML to app| YAPP
+  YAPP -.->|IdP metadata / JWKS| YENT
+  PBR -->|HTTPS Bearer| YAPI
+  YAPI -.->|JWKS| YENT
+```
+
+Partner authentication happens at the **home IdP**; your apps still trust **your** Entra issuer for assertions and tokens after B2B completes.
+
+## Where RBAC is configured
+
+Yes — for access to **your** applications and cloud resources, **configure RBAC (and related authorization) in your Entra ID tenant** (the **resource** tenant), not in the partner's IdP.
+
+| Concern | Where it is configured | Notes |
+|---|---|---|
+| **Who may use your enterprise apps** | **Your** Entra — app assignment, security groups, app roles | Assign guests (or external members) to apps/groups/roles in **your** directory |
+| **Azure RBAC** (subscriptions, resource groups, Key Vault, etc. in your cloud) | **Your** Entra / Azure — role assignments on the guest object or groups in your tenant | The home tenant cannot grant Azure RBAC in *your* subscriptions |
+| **Conditional Access / MFA for access to your apps** | **Your** Entra (resource policies); home MFA may be **trusted** via cross-tenant access inbound trust | You decide whether to accept home MFA/device claims; you still own resource CA |
+| **Authentication / credentials** | **Home** IdP or home Entra | Partner manages passwords, MFA enrollment, and their own directory RBAC for *their* apps |
+| **Partner's own app RBAC** | Partner's Entra / IdP | Irrelevant to authorizing access inside *your* tenant |
+
+**Practical rule:** home IdP proves *who the user is*; **your** Entra decides *what they can access* in your estate (groups, app roles, Azure RBAC, entitlement packages). Optional **cross-tenant synchronization** can bring group memberships into your tenant for assignment, but authorization decisions for your apps still evaluate identities and assignments that exist in **your** directory.
 
 ## Option A — Entra B2B collaboration, native Entra-to-Entra
 
@@ -112,6 +173,7 @@ Detailed checklists and Entra field names live in [07 — Key configurations](./
 - **Application outbound claims** — after B2B sign-in, configure each enterprise application or app registration for the UPN, email, display name, group, or role claims your **applications** need in **Entra-issued** assertions or tokens. Conditional Access evaluates sign-in conditions separately; it does not consume application outbound claim configuration
 - **`userType`, licensing, and Conditional Access are distinct settings** — B2B collaboration users commonly default to `userType = Guest`, but licensing (e.g., external identity monthly active user billing), Conditional Access scoping (`All guest and external users` vs specific users/groups), and group assignment are each configured independently; don't assume setting `userType` alone determines every policy outcome
 - **Application assignment** — enterprise applications and app registrations must allow guest access where partner users need entry; review default member-only assignments
+- **RBAC in your tenant** — assign guests to security groups, **app roles**, and (if needed) **Azure RBAC** in **your** Entra / Azure subscriptions; do not expect the partner IdP to authorize access to your resources
 
 ## Common pitfalls
 

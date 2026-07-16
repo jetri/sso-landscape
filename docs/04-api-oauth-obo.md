@@ -21,6 +21,51 @@
 | API (resource server) | Validates bearer tokens (`iss`, signature, `aud`, scopes/app roles, lifetime) before serving data |
 | Middle-tier API (OBO only) | Receives the user's token (`aud` = middle tier), exchanges it at Entra for a downstream token, calls the downstream API |
 
+## Components and network topology
+
+Focused views for **API access via Entra OAuth** (delegated, app-only, OBO). Landscape-wide diagrams live in [02](./02-components-and-topology.md).
+
+### High-level components
+
+```mermaid
+flowchart LR
+  C[Client app - web / SPA / daemon]
+  E[Entra ID - authorization server]
+  Mid[Optional middle-tier API]
+  API[Protected API - resource server]
+  Down[Optional downstream API]
+
+  C -->|token request| E
+  E -->|access token| C
+  C -->|Bearer access token| API
+  C -->|Bearer user token| Mid
+  Mid -->|OBO token request| E
+  E -->|downstream access token| Mid
+  Mid -->|Bearer| Down
+```
+
+### Network topology (logical)
+
+```mermaid
+flowchart TB
+  subgraph Internet_or_corp["Internet or corporate network"]
+    Client[Client / BFF / daemon]
+    MidH[Middle-tier API hosts]
+    APIH[API hosts]
+    ENT[Entra token and JWKS endpoints]
+  end
+
+  Client -->|HTTPS token endpoint| ENT
+  Client -->|HTTPS API + Bearer| APIH
+  Client -->|HTTPS API + Bearer| MidH
+  MidH -->|HTTPS OBO token request| ENT
+  MidH -->|HTTPS API + Bearer| APIH
+  APIH -.->|JWKS / discovery| ENT
+  MidH -.->|JWKS / discovery| ENT
+```
+
+Clients and APIs reach Entra over TLS for **token issuance**; APIs validate bearer tokens locally with JWKS. OBO adds a middle-tier hop that calls Entra's token endpoint before calling the downstream API.
+
 ## Pattern A — Delegated user access (web/SPA → API)
 
 **When:** A signed-in user (or interactive login) should call an API **as themselves**. The client obtains an access token with **delegated permissions** (scopes) that represent what the user is allowed to do.
