@@ -70,17 +70,49 @@ Partner authentication happens at the **home IdP**; your apps still trust **your
 
 ## Where RBAC is configured
 
-Yes — for access to **your** applications and cloud resources, **configure RBAC (and related authorization) in your Entra ID tenant** (the **resource** tenant), not in the partner's IdP.
+### Scenario: Company A employees → Company B portal
 
-| Concern | Where it is configured | Notes |
+| Requirement | Possible? | How |
 |---|---|---|
-| **Who may use your enterprise apps** | **Your** Entra — app assignment, security groups, app roles | Assign guests (or external members) to apps/groups/roles in **your** directory |
-| **Azure RBAC** (subscriptions, resource groups, Key Vault, etc. in your cloud) | **Your** Entra / Azure — role assignments on the guest object or groups in your tenant | The home tenant cannot grant Azure RBAC in *your* subscriptions |
-| **Conditional Access / MFA for access to your apps** | **Your** Entra (resource policies); home MFA may be **trusted** via cross-tenant access inbound trust | You decide whether to accept home MFA/device claims; you still own resource CA |
-| **Authentication / credentials** | **Home** IdP or home Entra | Partner manages passwords, MFA enrollment, and their own directory RBAC for *their* apps |
-| **Partner's own app RBAC** | Partner's Entra / IdP | Irrelevant to authorizing access inside *your* tenant |
+| 1. A employees access B’s website/portal | Yes | B2B into B’s tenant, or B’s **multi-tenant** app consented in A |
+| 2. Login page is **Company A Entra** | Yes | Native Entra↔Entra B2B (or home-realm discovery for multi-tenant apps) redirects to **A’s** authorize/login endpoints |
+| 3. A credentials never pass through B | Yes | Password/MFA stay at **A**. B receives federation results / tokens after A authenticates — not the user’s secret |
+| 4. **Company A manages RBAC** of who among A’s employees can use the portal | **Yes, with the right pattern** — not the default single-tenant B2B-only model |
 
-**Practical rule:** home IdP proves *who the user is*; **your** Entra decides *what they can access* in your estate (groups, app roles, Azure RBAC, entitlement packages). Optional **cross-tenant synchronization** can bring group memberships into your tenant for assignment, but authorization decisions for your apps still evaluate identities and assignments that exist in **your** directory.
+**Requirements 1–3** are the normal Entra B2B / multi-tenant sign-in path. **Requirement 4** needs an explicit design choice:
+
+#### Pattern 1 — Multi-tenant app (A manages day-to-day assignment)
+
+Company B publishes the portal as a **multi-tenant** Entra application. Company A’s admin **consents** once. After that, **Company A** assigns users/groups to that enterprise app **in Tenant A** (who is allowed to sign in). Users authenticate at **A**; the app receives tokens whose home tenant is A. This is the cleanest fit when “A owns who can use B’s portal.”
+
+Company B still owns the **application** (code, roles defined on the app registration, optional app-role definitions). Company A owns **which of A’s users are assigned**.
+
+#### Pattern 2 — B2B guest into B’s single-tenant app + A-managed group membership
+
+Company B hosts a **single-tenant** enterprise app. Company A users become **guests** (or synced external members) in **Tenant B**. Credentials still authenticate at **A** (1–3 satisfied).
+
+For **A to manage who has access** without B’s admins editing assignment daily:
+
+- **Cross-tenant synchronization** (A → B): A manages security-group membership in **A**; those users/groups sync into **B**; B does a **one-time** assignment of the synced group to the portal (or Azure RBAC). Day-to-day join/leave is administered in **A**.
+- Or **entitlement management** / access packages in B with A as a connected organization (approvals can involve A sponsors) — B still hosts the package; A can drive membership decisions.
+
+Without sync or a multi-tenant app, **B** must assign guests/groups in B’s directory — A cannot directly administer B’s enterprise-app RBAC from A’s admin center.
+
+#### What is *not* true by default
+
+In classic **single-tenant app + B2B guests** with no sync and no multi-tenant consent model, **B** (resource tenant) owns app assignment, app roles, and Azure RBAC in B’s subscriptions. A only owns authentication. That satisfies 1–3 but **not** 4.
+
+### Quick reference
+
+| Concern | Typical owner |
+|---|---|
+| Login UI / passwords / MFA enrollment | **Home tenant (A)** |
+| Credentials on the wire to B | **Never** — only post-auth tokens/assertions |
+| Who may use B’s portal (day-to-day) | **A** if multi-tenant assignment or A→B group sync; otherwise **B** |
+| Azure RBAC inside B’s Azure subscriptions | **B** (assignments on objects that exist in B, including synced groups) |
+| Conditional Access on B’s apps | **B** (may *trust* A’s MFA/device claims via cross-tenant access) |
+
+**Practical rule:** A proves *identity*; authorization for B’s resources is evaluated where the **app assignment and role data** live — either in **A** (multi-tenant enterprise-app assignment) or in **B** (guest/synced-group assignment). Design for requirement 4 explicitly; do not assume B2B alone puts RBAC under A.
 
 ## Option A — Entra B2B collaboration, native Entra-to-Entra
 

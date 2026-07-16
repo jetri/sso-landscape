@@ -47,7 +47,7 @@ Workforce B2B cross-federation uses **SAML 2.0 or WS-Federation** for partner Id
 - **Cross-tenant access settings** — inbound/outbound B2B trust (for example, acceptance of home-tenant MFA and device claims); does not replace native B2B authentication routing
 - **Guest `userType`** — partner users commonly arrive as `Guest` principals in your tenant
 - **Application assignment for guests** — enterprise applications and app registrations must permit guest access where partner users need entry
-- **RBAC in your (resource) tenant** — security groups, **app roles**, and **Azure RBAC** assignments on guest objects or groups in **your** directory; home IdP does not authorize your apps or subscriptions
+- **RBAC ownership (who manages “who can access”)** — default single-tenant B2B: resource tenant assigns apps/roles. If the **home** org must manage day-to-day access: use a **multi-tenant** app (home-tenant user/group assignment) or **cross-tenant sync** of home groups into the resource tenant with a one-time app assignment on the synced group. See [05 — Where RBAC is configured](./05-cross-federation.md#where-rbac-is-configured)
 
 ### Option B — B2B with federated SAML/WS-Fed partner IdP
 
