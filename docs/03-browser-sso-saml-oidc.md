@@ -65,9 +65,20 @@ Browser redirects cross the Entra ↔ app trust boundary; SaaS and APIs validate
 - Use **SAML 2.0** when the SaaS vendor requires it (common for older enterprise SaaS) or when OIDC is unavailable
 - Both protocols achieve the same outcome: the user authenticates at Entra and the application receives proof of identity to create a session
 
+### Key difference: how Entra and the SaaS “integrate”
+
+| | **SAML 2.0** | **OpenID Connect** |
+|---|---|---|
+| **Trust / integration model** | **Configuration-based federation** — exchange metadata and register endpoints/certs once (enterprise app ↔ SaaS admin). **Not** an API-call integration between Entra and the SaaS for login | **Configuration plus runtime HTTP to Entra** — app registration + discovery/JWKS, and typically a **token-endpoint** call (app → Entra) to exchange the authorization code for tokens |
+| **During sign-in** | Browser carries AuthnRequest / SAML Response; SaaS validates assertion **locally** with the IdP signing cert | Browser hits `/authorize`; confidential apps then call Entra’s **token endpoint** (back channel) for ID/access tokens |
+| **Passwords** | Stay at Entra — never sent to the SaaS | Stay at Entra — never sent to the SaaS |
+
+**Rule of thumb:** SAML trust is **direct via configuration (metadata)**, not via Entra↔SaaS API integration. OIDC still uses config for trust, but the **authorization-code** path adds a **live HTTP API call** from the app to Entra’s token endpoint — that back-channel step is a major difference from classic SAML browser SSO.
+
 | Aspect | SAML 2.0 | OpenID Connect |
 |---|---|---|
-| Trust setup | SAML metadata (entity ID, ACS, signing cert) | OIDC discovery + app registration (client ID, redirect URIs) |
+| Trust setup | SAML metadata (entity ID, ACS, signing cert) — **config only** | OIDC discovery + app registration (client ID, redirect URIs) |
+| Runtime Entra API call for tokens | **No** (assertion arrives via browser POST to ACS) | **Yes** (typical): token endpoint after `/authorize` |
 | Identity artifact | Signed **XML assertion** (claims inside assertion) | **ID token** (JWT) + optional **access token** |
 | Browser return path | HTTP POST to **ACS** (Assertion Consumer Service) | Redirect to **redirect URI** with authorization code |
 | API access | Not native — separate OAuth integration if APIs are needed | **Access token** with scopes for resource APIs |
@@ -114,16 +125,19 @@ The **ID token** tells the RP who signed in; the **access token** authorizes cal
 
 > **Note:** This sequence reflects a **confidential web app** or **BFF**: the server exchanges the code and holds the access token, then calls APIs on the user's behalf. For **public-client SPAs**, the browser completes the code+PKCE exchange, holds the access token, and calls the API directly.
 
+> **Contrast with SAML:** the `App->>Entra: Token endpoint` step is an **OIDC/OAuth runtime API call**. Classic SAML browser SSO has **no** equivalent — trust is configuration/metadata, and the assertion arrives via browser POST to the ACS (see [SAML SP-initiated](#saml-sp-initiated)).
+
 ## SAML SP-initiated
 
 Same SSO outcome as OIDC: user ends up signed in to the SaaS with an Entra-backed identity. SAML exchanges a signed **XML assertion** instead of OIDC JWTs.
 
 ### Is SAML a “direct” integration between Entra and the SaaS?
 
-**Yes — at the trust / configuration layer.** You create an **enterprise application** in Entra and exchange **SAML metadata** with the SaaS (entity IDs, ACS URL, IdP SSO endpoint, signing certificate). That is a **direct federation trust** between Entra (IdP) and the SaaS (SP).
+**Yes — direct federation via configuration (metadata), not via API-call integration.** You create an **enterprise application** in Entra and exchange **SAML metadata** with the SaaS (entity IDs, ACS URL, IdP SSO endpoint, signing certificate). That establishes trust between Entra (IdP) and the SaaS (SP). There is **no** requirement for Entra and the SaaS to call each other’s APIs to set up or complete login.
 
-**No — not a live back-channel for passwords or continuous IdP↔SaaS API calls during login.** The browser carries the **AuthnRequest** and **SAML Response**. Entra and the SaaS do not pass the user’s password to each other. After login, the SaaS validates the assertion **locally** using Entra’s signing certificate (from metadata); it does not call Entra on every page request.
+**Contrast with OIDC:** OIDC also starts with configuration (app registration, redirect URIs), but the common authorization-code flow then uses a **runtime HTTP call** to Entra’s **token endpoint** (app → Entra) to obtain tokens. SAML browser SSO has **no equivalent token-endpoint step** — the signed assertion is delivered by the **browser POST to the ACS**, then validated locally.
 
+**Credentials:** passwords and MFA stay at Entra; they are never posted to the SaaS.
 ```mermaid
 sequenceDiagram
   actor User
