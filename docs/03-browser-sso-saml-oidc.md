@@ -114,19 +114,40 @@ The **ID token** tells the RP who signed in; the **access token** authorizes cal
 
 > **Note:** This sequence reflects a **confidential web app** or **BFF**: the server exchanges the code and holds the access token, then calls APIs on the user's behalf. For **public-client SPAs**, the browser completes the code+PKCE exchange, holds the access token, and calls the API directly.
 
-## SAML SP-initiated (short)
+## SAML SP-initiated
 
 Same SSO outcome as OIDC: user ends up signed in to the SaaS with an Entra-backed identity. SAML exchanges a signed **XML assertion** instead of OIDC JWTs.
 
-- User opens the SaaS sign-in URL (or clicks "Sign in with SSO")
-- SaaS (SP) redirects or POSTs an **AuthnRequest** to Entra's SSO endpoint
-- Entra presents sign-in if no session exists; user authenticates (MFA per tenant policy)
-- Entra builds a **SAML Response** with a signed assertion (subject, NameID, attributes)
-- Browser **POSTs** the response to the SP's **ACS** URL over HTTPS
-- SP validates signature, issuer, audience, and `NotOnOrAfter`; maps assertion attributes to a local user
-- SP establishes an **application session** (cookie); assertion is consumed at login, not reused per request
-- **Single Logout** (optional) requires coordinated logout URLs on both sides—often incomplete in SaaS; plan session expiry accordingly
+### Is SAML a “direct” integration between Entra and the SaaS?
 
+**Yes — at the trust / configuration layer.** You create an **enterprise application** in Entra and exchange **SAML metadata** with the SaaS (entity IDs, ACS URL, IdP SSO endpoint, signing certificate). That is a **direct federation trust** between Entra (IdP) and the SaaS (SP).
+
+**No — not a live back-channel for passwords or continuous IdP↔SaaS API calls during login.** The browser carries the **AuthnRequest** and **SAML Response**. Entra and the SaaS do not pass the user’s password to each other. After login, the SaaS validates the assertion **locally** using Entra’s signing certificate (from metadata); it does not call Entra on every page request.
+
+```mermaid
+sequenceDiagram
+  actor User
+  participant Browser
+  participant SaaS as "SaaS (SAML SP)"
+  participant Entra as "Entra ID (IdP)"
+
+  User->>Browser: Open SaaS / Sign in with SSO
+  Browser->>SaaS: GET protected resource or SSO start
+  SaaS->>Browser: Redirect or POST AuthnRequest to Entra SSO
+  Browser->>Entra: SAML AuthnRequest
+  Entra->>Browser: Sign-in UI (if no session)
+  Note over Browser,Entra: Password and MFA stay at Entra - never sent to SaaS
+  User->>Entra: Authenticate
+  Entra->>Browser: SAML Response (signed assertion)
+  Browser->>SaaS: POST to ACS
+  SaaS->>SaaS: Validate signature, issuer, audience, lifetime
+  SaaS->>Browser: Application session established
+```
+
+- **SP-initiated** (above) is the common SaaS path: user starts at the SaaS, which sends them to Entra.
+- **IdP-initiated** (optional): user starts from an Entra/My Apps tile; Entra POSTs a SAML Response to the ACS without a prior AuthnRequest. Same trust; different entry point.
+- **Single Logout** (optional) needs coordinated logout URLs on both sides — often incomplete in SaaS; plan session expiry accordingly.
+- SAML browser SSO does **not** produce OAuth access tokens for your APIs; use a separate OAuth integration if APIs are required (see [04](./04-api-oauth-obo.md)).
 ## Key configurations
 
 Detailed checklists and Entra field names live in [07 — Key configurations](./07-key-configurations.md). For browser SSO, confirm at minimum:
