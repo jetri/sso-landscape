@@ -76,9 +76,9 @@ Clients and APIs reach Entra over TLS for **token issuance**; APIs validate bear
 sequenceDiagram
   actor User
   participant Browser
-  participant Client as "Client app (web / SPA)"
-  participant Entra as "Entra ID"
-  participant API as "Protected API"
+  participant Client as Client app (web / SPA)
+  participant Entra as Entra ID
+  participant API as Protected API
 
   User->>Browser: Open app
   Browser->>Entra: /authorize (client_id, redirect_uri, scope=API scope, PKCE)
@@ -86,9 +86,11 @@ sequenceDiagram
   User->>Entra: Authenticate (MFA per policy)
   Entra->>Browser: Redirect with authorization code
   Browser->>Client: Authorization code
-  Client->>Entra: Token endpoint (code + PKCE verifier; secret/cert if confidential)
+  Client->>Entra: Token endpoint (code + PKCE verifier, secret/cert if confidential)
   Entra->>Client: Access token (aud = API, delegated scp)
   Client->>API: Request + Bearer access token
+  API-->>Entra: Fetch signing keys via discovery + JWKS (cached, out-of-band)
+  Entra-->>API: Public signing keys (JWKS)
   API->>API: Validate aud, iss, signature, scopes (scp)
   API->>Client: Resource response (as the user)
 ```
@@ -107,13 +109,13 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-  participant Daemon as "Daemon / service (confidential client)"
-  participant Entra as "Entra ID"
-  participant API as "Protected API"
+  participant Daemon as Daemon / service (confidential client)
+  participant Entra as Entra ID
+  participant API as Protected API
 
   Note over Daemon: No user present - runs on a schedule or trigger
   Daemon->>Entra: Token endpoint (client credentials: client_id + secret/cert, scope = resource/.default)
-  Entra->>Daemon: Access token (aud = API, app roles in roles claim; no user scp)
+  Entra->>Daemon: Access token (aud = API, app roles in roles claim, no user scp)
   Daemon->>API: Request + Bearer access token
   API->>API: Validate aud, iss, signature, app roles (roles)
   API->>Daemon: Resource response (app-only authorization)
@@ -132,10 +134,10 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   actor User
-  participant Client as "Client app"
-  participant Mid as "Middle-tier API"
-  participant Entra as "Entra ID"
-  participant Down as "Downstream API"
+  participant Client as Client app
+  participant Mid as Middle-tier API
+  participant Entra as Entra ID
+  participant Down as Downstream API
 
   User->>Client: Authenticated session
   Client->>Mid: Call with user access token (aud=Mid)
