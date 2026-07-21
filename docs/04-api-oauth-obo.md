@@ -72,6 +72,27 @@ Clients and APIs reach Entra over TLS for **token issuance**; APIs validate bear
 
 **Flow:** Authorization code with **PKCE** for both public and confidential clients. Confidential clients also authenticate at the token endpoint with a client secret or certificate. After login, the token endpoint returns an **access token** whose **`aud`** (audience) is the target API—not the client app's ID. The **access token version** (and thus typical `aud` format) is controlled by the **resource API's** configuration (`accessTokenAcceptedVersion` / `requestedAccessTokenVersion`), not by whether the client calls the v1.0 or v2.0 token endpoint—either path can issue either format depending on that setting. **Version 1** tokens often use the API's **Application ID URI** (`api://…`) as `aud`; **version 2** tokens often use the API registration's **client ID (GUID)**. Validate against what Entra actually issues for each API registration. The client sends `Authorization: Bearer {access_token}` to the API.
 
+```mermaid
+sequenceDiagram
+  actor User
+  participant Browser
+  participant Client as "Client app (web / SPA)"
+  participant Entra as "Entra ID"
+  participant API as "Protected API"
+
+  User->>Browser: Open app
+  Browser->>Entra: /authorize (client_id, redirect_uri, scope=API scope, PKCE)
+  Entra->>Browser: Sign-in UI (if no session)
+  User->>Entra: Authenticate (MFA per policy)
+  Entra->>Browser: Redirect with authorization code
+  Browser->>Client: Authorization code
+  Client->>Entra: Token endpoint (code + PKCE verifier; secret/cert if confidential)
+  Entra->>Client: Access token (aud = API, delegated scp)
+  Client->>API: Request + Bearer access token
+  API->>API: Validate aud, iss, signature, scopes (scp)
+  API->>Client: Resource response (as the user)
+```
+
 **Scopes:** Request the narrowest delegated scopes the API exposes (e.g., `api://{api-app-id}/User.Read`). The API maps scopes (and optional claims) to authorization logic. Sign-in scopes (`openid`, `profile`, `email`) come from OIDC; **resource scopes** authorize API calls.
 
 **Key configs (summary):** Application ID URI on the API registration; exposed scopes; admin consent (or user consent where allowed) for the calling app to receive delegated scopes; **authorized client applications** as optional **preauthorization** for trusted clients (can suppress consent prompts—not the sole gate for token issuance); API-side **audience validation** must match the token's `aud`. See [07 — Key configurations](./07-key-configurations.md).
@@ -83,6 +104,20 @@ Clients and APIs reach Entra over TLS for **token issuance**; APIs validate bear
 **When:** A **background job, daemon, or service** calls an API **without a user present**—scheduled sync, nightly batch, microservice-to-microservice where no human is signed in.
 
 **Flow:** **Client credentials** grant. The confidential client authenticates to Entra with its client ID plus secret or certificate and requests an access token for the API. No user assertion is involved; authorization is based on **application permissions** (app roles) granted to the client, typically via `https://graph.microsoft.com/.default` or `api://{api-app-id}/.default` depending on the resource.
+
+```mermaid
+sequenceDiagram
+  participant Daemon as "Daemon / service (confidential client)"
+  participant Entra as "Entra ID"
+  participant API as "Protected API"
+
+  Note over Daemon: No user present - runs on a schedule or trigger
+  Daemon->>Entra: Token endpoint (client credentials: client_id + secret/cert, scope = resource/.default)
+  Entra->>Daemon: Access token (aud = API, app roles in roles claim; no user scp)
+  Daemon->>API: Request + Bearer access token
+  API->>API: Validate aud, iss, signature, app roles (roles)
+  API->>Daemon: Resource response (app-only authorization)
+```
 
 **Permissions:** Admin consent for **application permissions** (app roles defined on the API registration). The resulting token has **no user context**—no delegated `scp` claim—though it may still carry a `sub` identifying the service principal. Authorization is based on **application roles** (`roles`), not delegated scopes. Downstream APIs must enforce app-only authorization explicitly (role checks, separate endpoints, or deny user-context assumptions).
 
@@ -97,10 +132,10 @@ Clients and APIs reach Entra over TLS for **token issuance**; APIs validate bear
 ```mermaid
 sequenceDiagram
   actor User
-  participant Client as Client app
-  participant Mid as Middle-tier API
-  participant Entra as Entra ID
-  participant Down as Downstream API
+  participant Client as "Client app"
+  participant Mid as "Middle-tier API"
+  participant Entra as "Entra ID"
+  participant Down as "Downstream API"
 
   User->>Client: Authenticated session
   Client->>Mid: Call with user access token (aud=Mid)
