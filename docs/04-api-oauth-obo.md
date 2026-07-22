@@ -10,7 +10,7 @@
 
 - **Browser sign-in only** (SAML/OIDC to establish a SaaS session, no first-party API calls) → [03 — Browser SSO](./03-browser-sso-saml-oidc.md)
 - **Partner users authenticate at their home IdP** (B2B guest or inbound federation) → [05 — Cross-federation](./05-cross-federation.md)
-- **On-prem AD-backed apps** using ADFS WS-Fed or SAML, not Entra OAuth → [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)
+- **On-prem AD-backed apps** using ADFS (WS-Fed, SAML, or ADFS OIDC), not Entra OAuth → [06 — Legacy ADFS and AD](./06-legacy-adfs-ad.md)
 
 ## Actors
 

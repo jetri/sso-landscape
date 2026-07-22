@@ -23,7 +23,7 @@ Enterprise architects and application developers who need a **decision reference
 | Service/daemon calling APIs (no user) | App-only | Client credentials | [04](./04-api-oauth-obo.md) |
 | API needs user context via another API | Delegated chain | OAuth On-Behalf-Of (OBO) | [04](./04-api-oauth-obo.md) |
 | Your employees → **partner’s custom portal**; login at your Entra; you manage RBAC; credentials not at partner | Cross-federation | Multi-tenant app or B2B + sync | [05](./05-cross-federation.md) |
-| In-house app SSO against on-prem AD (legacy) | ADFS + Active Directory | WS-Fed and/or SAML 2.0 | [06](./06-legacy-adfs-ad.md) |
+| In-house app SSO against on-prem AD (legacy) | ADFS + Active Directory | WS-Fed, SAML 2.0, or OIDC (ADFS 2016+) | [06](./06-legacy-adfs-ad.md) |
 
 ## Pattern catalog (summary)
 
@@ -32,7 +32,7 @@ Enterprise architects and application developers who need a **decision reference
 - **App-only (client credentials):** Daemons and background services obtain access tokens without a signed-in user—see [04](./04-api-oauth-obo.md); topology in [02](./02-components-and-topology.md); configs in [07](./07-key-configurations.md).
 - **Delegated chain (OBO):** A middle-tier API exchanges the user's token for a downstream API token that preserves user context—see [04](./04-api-oauth-obo.md); topology in [02](./02-components-and-topology.md); configs in [07](./07-key-configurations.md).
 - **Cross-federation:** **Your** employees access a **third-party partner’s** custom portal (partner-hosted app), sign in at **your** Entra, credentials never through the partner, **you** manage RBAC—see [05](./05-cross-federation.md). Not a fallback when SaaS federation exists; use when the workload is the **partner’s tenant-hosted application**.
-- **Legacy ADFS + Active Directory:** In-house applications on the corporate identity plane authenticate against on-prem ADFS backed by AD—see [06](./06-legacy-adfs-ad.md); legacy path in [02](./02-components-and-topology.md); ADFS configs in [07](./07-key-configurations.md).
+- **Legacy ADFS + Active Directory:** In-house applications on the corporate identity plane authenticate against on-prem ADFS backed by AD (WS-Fed, SAML, or OIDC on ADFS 2016+)—see [06](./06-legacy-adfs-ad.md); legacy path in [02](./02-components-and-topology.md); ADFS configs in [07](./07-key-configurations.md).
 
 ## Terminology
 

@@ -68,6 +68,8 @@ Primary scenario: **Company A employees** access **Company B’s portal**, sign 
 
 ## ADFS / Active Directory — in-house RP
 
+**WS-Fed / SAML**
+
 - **ADFS federation service URL** — farm hostname; becomes the token **issuer** relying parties pin
 - **Federation metadata URL** — WS-Fed or SAML metadata document (endpoints, token-signing certificates)
 - **Relying party trust identifier (realm)** — audience URI the app validates (`wtrealm` / SAML `Audience`)
@@ -76,6 +78,18 @@ Primary scenario: **Company A employees** access **Company B’s portal**, sign 
 - **Issuance transform rules** — claim rules mapping AD attributes (UPN, email, display name, group SIDs) to outbound claim types
 - **Token-signing certificate** — current ADFS signing cert in metadata; schedule rollover and update all relying parties before expiry
 - **Token-signing certificate trust on the app** — app's trusted signing cert store or metadata import aligned with ADFS
+
+**OIDC (ADFS 2016+)**
+
+- **OIDC discovery URL** — `https://{adfs-hostname}/adfs/.well-known/openid-configuration` (issuer, authorize, token, JWKS)
+- **Client ID** — application group / OAuth client identifier on ADFS
+- **Redirect URI** — exact OIDC callback registered on ADFS and validated by the RP
+- **Scopes** — `openid` for ID token; optional resource scopes for ADFS-issued access tokens
+- **Client authentication / PKCE** — confidential client secret or certificate, or public-client PKCE as configured
+- **JWKS URI** — app validates JWT signature locally using ADFS public keys (cached via discovery)
+
+**Shared**
+
 - **Authentication method assumption** — Windows Integrated Authentication (WIA) on corp network vs. forms-based authentication off-network
 - **Active Directory attribute store** — domain controllers supplying credentials and directory attributes to ADFS
 - **Web Application Proxy (WAP)** — optional edge publication of ADFS endpoints for external users (DMZ placement)

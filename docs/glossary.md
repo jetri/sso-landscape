@@ -16,7 +16,7 @@ Microsoft's on-premises directory service that stores user accounts, groups, and
 
 ### ADFS (Active Directory Federation Services)
 
-On-premises Windows Server role that acts as a federation IdP/STS for in-house applications backed by Active Directory. It issues WS-Federation or SAML tokens to relying party trusts and can federate outbound to cloud IdPs. Choose ADFS when the app, users, and trust model are still AD-centric; plan Entra migration when building new cloud-facing workloads.
+On-premises Windows Server role that acts as a federation IdP/STS for in-house applications backed by Active Directory. It issues WS-Federation or SAML tokens to relying party trusts, and on **Windows Server 2016+** can also act as an OpenID Connect / OAuth 2.0 authorization server for application groups. It can federate outbound to cloud IdPs. Choose ADFS when the app, users, and trust model are still AD-centric; plan Entra migration when building new cloud-facing workloads.
 
 ### Audience (`aud`)
 
